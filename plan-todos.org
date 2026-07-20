@@ -1,0 +1,95 @@
+#+TITLE: plan-todos.org
+#+DESCRIPTION: Detailed implementation steps for MCQ Quiz Generator
+
+Inspired by [[https://github.com/megamind1230/nextlearn][megamind1230/nextlearn]] MCQ feature.
+
+* Phase 1: Scaffold Electron + React project                        [DONE]
+  - [X] Initialize package.json with Electron + React + TypeScript
+  - [X] Configure electron-vite build
+  - [X] Create main process (src/main/index.ts)
+  - [X] Create preload script (src/preload/index.ts)
+  - [X] Create React renderer with tab navigation
+  - [X] Set up basic dark theme CSS
+  - [X] Add IPC handlers: file read/write/list, dialog, logging
+  - [X] Verify build compiles
+
+* Phase 2: File operations + MCQ format parser                       [DONE]
+  - [X] File picker for .txt/.md/.org input files
+  - [X] Read and display input file content
+  - [X] Port .mcq parser from nextlearn (McqFileParser)
+  - [X] .mcq file writer (serialize McqDocument to .mcq format)
+  - [X] Input content extractor (.txt/.md/.org -> plain text)
+  - [X] MCQ file listing (scan directory for .mcq files)
+
+* Phase 3: Gemini MCQ generation service                             [DONE]
+  - [X] Settings page for Gemini API key + output directory
+  - [X] McqGenerationService (same prompt + model fallback as nextlearn)
+  - [X] Model discovery fallback chain (gemini-2.5-flash -> 2.0 -> flash-latest -> 1.5)
+  - [X] Preview generated questions before saving
+  - [X] Accept/cancel flow -> save .mcq file
+
+* Phase 4: Quiz taking UI                                            [DONE]
+  - [X] Load .mcq file -> display questions one at a time
+  - [X] Timer (count up from 0:00)
+  - [X] Option selection (A/B/C/D clickable cards)
+  - [X] Next/Previous navigation
+  - [X] Score calculation on completion
+  - [X] Review page: correct/wrong indicators + explanations
+  - [X] Keyboard shortcuts (N/P, A/B/C/D)
+
+* Phase 5: Quiz logs + polish                                        [DONE]
+  - [X] Log quiz results to localStorage
+  - [X] Display quiz history in Logs tab (table: date, title, score, questions, time)
+  - [X] Dark/light theme toggle
+  - [X] Settings context for cross-component state
+
+* Phase 6: Rich text rendering                                       [DONE]
+  - [X] KaTeX math rendering (inline $...$ and display $$...$$)
+  - [X] Code syntax highlighting (highlight.js, fenced blocks + inline)
+  - [X] Copy button on code/math blocks
+  - [X] Click-to-copy on inline code and math with visual feedback
+  - [X] renderRichText utility with placeholder-based XSS protection
+
+* Phase 7: Quiz UX improvements                                      [DONE]
+  - [X] Instant feedback toggle (settings.instantFeedback)
+  - [X] When feedback off: blue selected highlight, no correct/wrong during quiz
+  - [X] Results page shows explanations with full LaTeX + code rendering
+  - [X] Esc/q keyboard shortcut to quit quiz (active or results) back to list
+  - [X] Clipboard copy feedback ("Copied!" on buttons, green flash on inline)
+
+* Phase 8: Bug fixes + testing                                       [DONE]
+  - [X] Removed hardcoded developer-specific paths (settings, components)
+  - [X] Added app:getPaths IPC handler for runtime path resolution
+  - [X] Installed vitest, added test/watch scripts
+  - [X] mcqParser tests (parse, frontmatter, edge cases)
+  - [X] mcqWriter tests (serialize, roundtrip with parser)
+  - [X] inputParser tests (.txt, .md, .org extraction)
+  - [X] renderRichText tests (code, math, copy IDs)
+
+* Phase 9: More bug fixes + UX                                       [DONE]
+  - [X] Removed unused electron-store dependency
+  - [X] Tab switch confirms when quiz is active (onActiveChange callback)
+  - [X] Added "← Back" button to quiz interactive UI
+
+* Phase 10: Final bug sweep                                           [DONE]
+  - [X] Clear rawContentMap on quiz exit (memory leak fix)
+  - [X] Fix YAML parser colon handling in quoted values
+  - [X] Clamp question count to [1, 50] in JS
+  - [X] Fix org parser to skip block content between BEGIN/END
+  - [X] All bugs.org items cleared
+
+* Future: Skipped features (add later)                               [TODO]
+  - [ ] Anki export
+  - [ ] Heatmap / streak tracking
+  - [ ] Tag inference (AI-powered)
+  - [ ] Wiki links / deck navigation
+  - [ ] EF Core / database for persistent storage
+  - [ ] Custom theme presets
+  - [ ] Spaced repetition algorithm
+  - [ ] Command palette
+  - [ ] Keyboard shortcut profiles (Vim/Emacs/VSCode)
+  - [ ] Image rendering in quiz content
+  - [ ] Cloze-style flashcards
+  - [ ] Multi-language support (i18n)
+  - [ ] Quiz shuffle (randomize question order)
+  - [ ] Export quiz results to CSV/org

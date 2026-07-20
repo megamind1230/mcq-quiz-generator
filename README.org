@@ -1,0 +1,287 @@
+#+TITLE: README.org
+#+DESCRIPTION: MCQ Quiz Generator - Create and take MCQ quizzes from text files
+
+* MCQ Quiz Generator
+
+Desktop app for generating and taking multiple-choice quizzes from
+plain text, Markdown, or Org files.  Uses Google Gemini (free tier)
+to auto-generate questions, or you can write =.mcq= files by hand.
+
+Inspired by the MCQ feature in
+[[https://github.com/megamind1230/nextlearn][megamind1230/nextlearn]].
+This project ports the core concept (AI generation, =.mcq= file format,
+interactive quiz) to an Electron + React stack.
+
+* Features
+
+** Generation
+  - Generate MCQ quizzes from =.txt=, =.md=, =.org= source files
+  - AI-powered via Google Gemini API (free tier, no billing required)
+  - Model auto-discovery fallback (tries multiple Gemini models)
+  - Preview first 3 questions before saving
+  - Token estimation with safe truncation for large files
+  - Copy-paste-ready prompt template in Settings for manual AI use
+
+** Quiz
+  - One question at a time with A/B/C/D clickable option cards
+  - Count-up timer
+  - Instant feedback toggle (show correct/wrong on click, or only at results)
+  - Explanation display after each answer
+  - Next/Previous navigation
+  - =← Back= button to quit to quiz list
+  - Esc / q to quit from anywhere
+
+** Rich Content
+  - LaTeX math rendering (KaTeX) -- inline =\$...\$= and display =\$\$...\$\$=
+  - Code syntax highlighting (highlight.js) -- fenced blocks + inline =`=code`=`
+  - Click-to-copy:
+    - *Code blocks / display math:* hover to reveal a *Copy* button (top-right)
+    - *Inline code / inline math:* click the element directly to copy
+    - *Feedback:* button text swaps to "Copied!" for 1s, inline gets a green flash
+
+** Results
+  - Percentage score with color coding (green/orange/red)
+  - Per-question review: correct, wrong, or skipped
+  - Full rich text rendering in explanations (LaTeX, code)
+  - Results logged to localStorage for history
+
+** Keyboard Shortcuts
+  | Key         | Action                        |
+  |-------------+-------------------------------|
+  | =a= =b= =c= =d= | Select answer                 |
+  | =n= / =→=         | Next question                 |
+  | =p= / =←=         | Previous question             |
+  | =j= / =k=         | Scroll down / up              |
+  | =h= / =l=         | Scroll left / right           |
+  | =Esc= / =q=       | Quit to quiz list (saves nothing) |
+
+** General
+  - Dark / light theme toggle
+  - Configurable MCQ output directory
+  - File manager selector (26 Linux file managers supported)
+  - Quiz history table (date, title, score, questions, time)
+  - Frameless window with custom title bar
+
+* Prerequisites
+  - Node.js 18+ and npm
+  - Linux (tested), macOS, or Windows
+  - Google Gemini API key (free) -- get one at [[https://aistudio.google.com/apikey][AI Studio]]
+
+* Quick Start
+
+  #+BEGIN_SRC bash
+  git clone <repo-url> && cd mcq-quiz-generator
+  npm install
+  npm run dev
+  #+END_SRC
+
+  1. Go to *Settings* tab, paste your Gemini API key
+  2. Go to *Generate* tab, open a .txt / .md / .org file
+  3. Set question count, click *Generate MCQs*
+  4. Preview, then *Save .mcq File*
+  5. Go to *Quiz* tab, click the saved quiz to start
+
+* Available Scripts
+
+  | Command               | Description                          |
+  |-----------------------+--------------------------------------|
+  | =npm run dev=         | Start in development mode            |
+  | =npm run build=       | Build for production                 |
+  | =npm run preview=     | Preview production build             |
+  | =npm test=            | Run unit tests (vitest)              |
+  | =npm run test:watch=  | Run tests in watch mode              |
+  | =npm run typecheck=   | Type-check both node and web code    |
+  | =npm run lint=        | Lint renderer source with ESLint     |
+
+* Project Structure
+
+  #+BEGIN_SRC
+  mcq-quiz-generator/
+  ├── src/
+  │   ├── main/              # Electron main process
+  │   │   └── index.ts       # Window, IPC handlers, file ops
+  │   ├── preload/           # Context bridge (main <-> renderer)
+  │   │   └── index.ts
+  │   └── renderer/          # React frontend
+  │       └── src/
+  │           ├── App.tsx              # Root component, tab nav
+  │           ├── SettingsContext.tsx   # Settings React context
+  │           ├── types.ts             # Shared TypeScript types
+  │           ├── styles.css           # All CSS
+  │           ├── components/
+  │           │   ├── GeneratePanel.tsx # AI generation UI
+  │           │   ├── QuizView.tsx      # Quiz + results UI
+  │           │   ├── QuizLogs.tsx      # Quiz history table
+  │           │   └── Settings.tsx      # Settings page
+  │           ├── utils/
+  │           │   ├── mcqParser.ts      # .mcq -> McqDocument
+  │           │   ├── mcqWriter.ts      # McqDocument -> .mcq
+  │           │   ├── mcqGenerator.ts   # Gemini API calls
+  │           │   ├── inputParser.ts    # .txt/.md/.org -> plain text
+  │           │   ├── renderRichText.ts # KaTeX + highlight.js
+  │           │   ├── settings.ts       # Load/save settings
+  │           │   └── quizLogger.ts     # localStorage results
+  │           └── __tests__/            # Unit tests (vitest)
+  ├── out/                   # Built output (gitignored)
+  ├── plan-todos.org         # Implementation plan
+  ├── bugs.org               # Known bugs and fixes
+  ├── changelog.org          # Version history
+  └── README.org
+  #+END_SRC
+
+* How It Works
+
+  1. *Input:* User picks a .txt/.md/.org file
+  2. *Strip:* =inputParser= removes markup, returns plain text
+  3. *Generate:* Plain text is sent to Gemini API with a structured prompt
+  4. *Parse:* AI response is parsed into =McqDocument= (questions + options + answers)
+  5. *Save:* Serialized to =.mcq= format (YAML frontmatter + markdown questions)
+  6. *Quiz:* =mcqParser= reads =.mcq= files, =QuizView= renders questions
+  7. *Results:* Score + per-question review, logged to localStorage
+
+* Gemini Prompt
+
+  The prompt sent to Gemini (also available as a copy-paste template in
+  Settings).  You can use this with any AI agent to generate =.mcq= files
+  manually.
+
+  #+BEGIN_EXAMPLE
+  You are an educator creating multiple-choice questions from study material.
+  Given the deck content below, create {questionCount} questions.
+
+  Format each question EXACTLY like this:
+
+  ## Question N
+  {question text}
+
+  A. {option A}
+  B. {option B}
+  C. {option C}
+  D. {option D}
+
+  **Answer:** A
+  **Explanation:** {why this is correct}
+
+  ---
+
+  Rules:
+  - Each question must have exactly 4 options (A, B, C, D)
+  - Make sure exactly one answer is correct
+  - Distractors should be plausible but clearly wrong
+  - Use --- on its own line as a separator between questions
+  - Do NOT use any markdown code fences
+  - Cover EVERY section of the content -- do not skip any part
+  - Generate exactly {questionCount} questions
+  #+END_EXAMPLE
+
+* MCQ File Format (.mcq)
+
+  =.mcq= files are regular Markdown with a strict structure.  You can
+  write them by hand or generate them with the app.  The parser is
+  deterministic -- no guessing, no tolerance for deviations.
+
+** Frontmatter (required)
+
+  Must start with YAML frontmatter delimited by =---=.
+
+  | Field       | Purpose                         | Example              |
+  |-------------+---------------------------------+----------------------|
+  | =title=     | Display name shown in quiz list | =Algebra Quiz=       |
+  | =source=    | Original source filename        | =algebra.md=         |
+  | =generated= | Timestamp of creation           | =2026-07-18 14:30=   |
+
+** Question blocks (strict order)
+
+  After frontmatter, each question follows this *exact* sequence:
+
+  1. =## Question N= heading (N = 1, 2, 3, ...)
+  2. Question text (one or more lines)
+  3. Four options: =A.=, =B.=, =C.=, =D.= (each on its own line)
+  4. =**Answer:**= followed by the correct letter
+  5. =**Explanation:**= followed by explanation text (optional)
+  6. =---= separator before the next question
+
+** Example
+
+  #+BEGIN_SRC markdown
+  ---
+  title: Algebra Quiz
+  source: algebra.md
+  generated: 2026-07-18 14:30
+  ---
+
+  ## Question 1
+  What is 2 + 2?
+
+  A. 3
+  B. 4
+  C. 5
+  D. 6
+
+  **Answer:** B
+  **Explanation:** 2 + 2 = 4. Basic arithmetic.
+
+  ---
+
+  ## Question 2
+  Solve for x: 2x = 10
+
+  A. x = 2
+  B. x = 5
+  C. x = 10
+  D. x = 20
+
+  **Answer:** B
+  **Explanation:** Divide both sides by 2.
+  #+END_SRC
+
+** Rich text in questions
+
+  Questions and explanations support LaTeX and code:
+
+  - Inline math: =$x^2 + y^2 = z^2$=
+  - Display math: =$$\int_0^1 f(x)\,dx$$=
+  - Fenced code: =```python\ncode\n```=
+  - Inline code: =`=code`=`
+
+* Settings
+
+  Accessible from the Settings tab:
+
+  | Setting          | Description                                          |
+  |------------------+------------------------------------------------------|
+  | Gemini API Key   | Required for AI generation. Free at AI Studio.       |
+  | MCQ Output Dir   | Where =.mcq= files are saved. Default: =~/magnus/mcq-quiz-generator/mcqs= |
+  | File Manager     | File manager to open directories (26 options)        |
+  | Theme            | Dark / light mode                                    |
+  | Instant Feedback | Show correct/wrong on click (on) or only at results (off) |
+
+* Logs
+
+  App logs: =~/magnus/mcq-quiz-generator/logs/YYYY-MM-DD.log=
+  Quiz results: localStorage (browser local storage, per-machine)
+
+* Tech Stack
+
+  | Layer          | Tech                    | Version  |
+  |----------------+-------------------------+----------|
+  | Desktop shell  | Electron                | ^33      |
+  | UI framework   | React + TypeScript      | ^19      |
+  | Build tooling  | electron-vite + Vite    | ^2 / ^5  |
+  | Math rendering | KaTeX                   | ^0.18    |
+  | Code highlight | highlight.js            | ^11      |
+  | AI backend     | Gemini API (REST)       | free     |
+  | Unit tests     | vitest                  | ^4       |
+
+* Contributing
+
+  #+BEGIN_SRC bash
+  npm run dev          # start dev server
+  npm test             # run tests
+  npm run typecheck    # type-check
+  npm run lint         # lint
+  #+END_SRC
+
+  - Keep =bugs.org=, =changelog.org=, =plan-todos.org= in sync
+  - Run =npm test= before committing
+  - Follow existing code style (no new dependencies without good reason)

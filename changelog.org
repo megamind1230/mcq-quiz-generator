@@ -1,0 +1,64 @@
+#+TITLE: changelog.org
+#+DESCRIPTION: Update tracking for MCQ Quiz Generator
+
+Inspired by [[https://github.com/megamind1230/nextlearn][megamind1230/nextlearn]] MCQ feature.
+
+* v0.1.0 - 2026-07-18
+  Initial scaffold.
+  - [X] Electron + React + TypeScript project setup
+  - [X] electron-vite build configuration
+  - [X] Main process with IPC handlers (file ops, dialogs, logging)
+  - [X] Preload script with context bridge
+  - [X] React renderer with tab navigation (Generate, Quiz, Logs, Settings)
+  - [X] Dark theme CSS
+  - [X] Placeholder components for all tabs
+  - [X] Type definitions (McqQuestion, McqDocument, QuizResult, AppSettings)
+
+* v0.2.0 - 2026-07-18
+  Core functionality.
+  - [X] MCQ file parser (ported from nextlearn .mcq format)
+  - [X] MCQ file writer (serialize McqDocument to .mcq)
+  - [X] Input file content extractor (.txt, .md, .org)
+  - [X] Gemini MCQ generation service (model fallback chain, prompt from nextlearn)
+  - [X] Generate panel: file picker, content preview, question count, generate button
+  - [X] Preview generated questions before saving
+  - [X] Settings: Gemini API key, MCQ output directory, theme toggle
+  - [X] SettingsContext for cross-component state
+  - [X] Quiz view: file list, question display, timer, answer selection
+  - [X] Quiz navigation (N/P, A/B/C/D keyboard shortcuts)
+  - [X] Quiz results page with scoring and question review
+  - [X] Quiz result logging (localStorage)
+  - [X] Quiz logs table (date, title, score, questions, time)
+  - [X] Light/dark theme toggle
+  - [X] Full CSS with quiz option cards, progress, timer, results
+
+* v0.3.0 - 2026-07-20
+  Rich text rendering + quiz UX improvements.
+  - [X] KaTeX math rendering (inline and display mode)
+  - [X] Code syntax highlighting via highlight.js
+  - [X] Copy button on code/math blocks, click-to-copy on inline elements
+  - [X] Clipboard copy feedback ("Copied!" text swap, green flash on inline)
+  - [X] Instant feedback toggle -- when off, no correct/wrong shown during quiz
+  - [X] Results page renders LaTeX and code (full rich text)
+  - [X] Esc/q keyboard shortcut to quit quiz back to Take Quiz page
+  - [X] Fixed: instant feedback setting was completely ignored
+  - [X] Fixed: inline math/code copy broken (KaTeX child element issue)
+  - [X] Updated README.org, plan-todos.org, bugs.org, changelog.org
+
+* v0.3.1 - 2026-07-20
+  Bug fixes.
+  - [X] Fixed hardcoded developer-specific paths -- now uses =app.getPath('userData')= and =os.homedir()=
+  - [X] Added unit testing with vitest (24 tests across 4 modules)
+
+* v0.3.2 - 2026-07-20
+  Bug fixes + UX.
+  - [X] Removed unused =electron-store= dependency
+  - [X] Tab switch now confirms when quiz is active (prevents silent state loss)
+  - [X] Added "← Back" button to quiz interactive UI
+
+* v0.3.3 - 2026-07-20
+  Bug fixes (all remaining bugs.org items cleared).
+  - [X] Fixed rawContentMap memory leak -- clear on quiz exit
+  - [X] Fixed YAML parser colon handling -- quoted values with colons now work
+  - [X] Added question count JS validation (clamp 1-50)
+  - [X] Fixed org parser to skip block content between BEGIN/END

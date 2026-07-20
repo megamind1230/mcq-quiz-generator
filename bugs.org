@@ -1,0 +1,34 @@
+#+TITLE: bugs.org
+#+DESCRIPTION: Known bugs and fix strategies for MCQ Quiz Generator
+
+* Current Bugs
+  No bugs reported yet.
+
+* Fixed Bugs
+  - [X] Hardcoded developer-specific paths (v0.3.1) -- Config dir, MCQ output dir,
+        and log dir were hardcoded to =/home/dt/...=.  Fixed by adding
+        =app:getPaths= IPC handler using =app.getPath('userData')= and
+        =os.homedir()=.  Settings and components now call =getPaths()= at runtime.
+  - [X] rawContentMap memory leak (v0.3.3) -- Map grew unboundedly across
+        renders.  Fixed by exporting =clearRawContentMap()= and calling it
+        on quiz exit (Back button, Esc/q, results page).
+  - [X] YAML parser breaks on colons in values (v0.3.3) -- =extractYamlField=
+        regex stopped at first colon.  =title: My Quiz: Part 2= was truncated.
+        Fixed by matching quoted strings greedily before falling back to unquoted.
+  - [X] No question count JS validation (v0.3.3) -- HTML =min/max= was the
+        only constraint.  Fixed by clamping to [1, 50] in =onChange= handler.
+  - [X] Org parser sends block content to Gemini (v0.3.3) -- Content between
+        =#+BEGIN_SRC= and =#+END_SRC= was not skipped.  Fixed by tracking
+        =inBlock= state and skipping lines while inside a block.
+  - [X] electron-store unused dependency (v0.3.2) -- Removed from =package.json=.
+        Settings use raw file I/O via IPC instead.
+  - [X] Timer not cleared on tab switch (v0.3.2) -- Added =onActiveChange=
+        callback from QuizView to App.  Tab switch now confirms when quiz is active.
+  - [X] Instant feedback setting ignored (v0.3.0) -- =settings.instantFeedback=
+        was never read in QuizView.tsx.  Fixed by gating correct/wrong styling
+        and explanation display on the setting.
+  - [X] Inline math/Code copy not working (v0.3.0) -- =e.target= was a KaTeX
+        child element without =data-copy-id=.  Fixed by using
+        =el.closest('[data-copy-id]')=.
+  - [X] No clipboard copy feedback (v0.3.0) -- Added "Copied!" text swap on
+        copy buttons and green outline flash on inline code/math.
