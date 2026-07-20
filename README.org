@@ -10,7 +10,24 @@ to auto-generate questions, or you can write =.mcq= files by hand.
 Inspired by the MCQ feature in
 [[https://github.com/megamind1230/nextlearn][megamind1230/nextlearn]].
 This project ports the core concept (AI generation, =.mcq= file format,
-interactive quiz) to an Electron + React stack.
+  interactive quiz) to an Electron + React stack.
+
+* Screenshots
+
+  [[file:screenshots/default-generate-page.png]]
+  Generate tab -- pick a source file and generate MCQs with Gemini.
+
+  [[file:screenshots/take-quiz-list.png]]
+  Quiz tab -- browse and start saved .mcq quizzes.
+
+  [[file:screenshots/interactive-quiz-UI.png]]
+  Interactive quiz -- one question at a time with rich text, timer, keyboard shortcuts.
+
+  [[file:screenshots/quiz-logs.png]]
+  Logs tab -- quiz history with scores and timing.
+
+  [[file:screenshots/settings.png]]
+  Settings -- API key, output directory, theme, feedback toggle.
 
 * Features
 

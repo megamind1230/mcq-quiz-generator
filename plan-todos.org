@@ -79,6 +79,7 @@ Inspired by [[https://github.com/megamind1230/nextlearn][megamind1230/nextlearn]
   - [X] All bugs.org items cleared
 
 * Future: Skipped features (add later)                               [TODO]
+  - [X] screenshots dir
   - [ ] Anki export
   - [ ] Heatmap / streak tracking
   - [ ] Tag inference (AI-powered)
