@@ -78,6 +78,25 @@ Inspired by [[https://github.com/megamind1230/nextlearn][megamind1230/nextlearn]
   - [X] Fix org parser to skip block content between BEGIN/END
   - [X] All bugs.org items cleared
 
+* Phase 11: Multi-answer questions + encryption                        [DONE]
+  - [X] New multi-answer =.mcq= syntax: =**[Answer:A,C]=** (no space after colon)
+  - [X] =McqQuestion.correctIndices[]= + =multiAnswer=, exact-match grading
+  - [X] Parser regex handles single and multi answer lines
+  - [X] Writer emits both answer forms correctly
+  - [X] Generator multi-answer mode + copy-paste prompts (=buildPrompt=, =generateMcqs=)
+  - [X] Quiz UI: checkbox/radio markers, tags, Your/Correct Answer(s) in results
+  - [X] Optional AES-GCM encrypted output (=.emcq=) opened side-by-side with =.mcq=
+  - [X] Leave button (red) + amber tab underline styling
+  - [X] Tests rewritten/extended -- 38 tests across 6 files, all green
+
+* Phase 12: Companion mobile PWA + repo rename                          [DONE]
+  - [X] Renamed repository =mcq-quiz-generator= -> =mcq-quiz-generator-desktop=
+  - [X] Scaffolded =mcq-quiz-generator-mobile= (Vite + React + vite-plugin-pwa)
+  - [X] Ported parser/exporter/logger/shuffle/renderRichText to mobile
+  - [X] WebCrypto AES-GCM .emcq decrypt (interop-verified against desktop fixtures)
+  - [X] Import via in-app file picker, offline quiz, local logs, PDF via print
+  - [X] Mobile tests (16) + production build with PWA precache/manifest/icons
+
 * Future: Skipped features (add later)                               [TODO]
   - [X] screenshots dir
   - [ ] Anki export

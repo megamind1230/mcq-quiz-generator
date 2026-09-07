@@ -25,7 +25,9 @@ export function serializeMcq(doc: McqDocument): string {
       lines.push(`${labels[j]}. ${opt}`)
     })
     lines.push('')
-    lines.push(`**Answer:** ${labels[q.correctIndex]}`)
+    const answerLetters = q.correctIndices.map(idx => labels[idx]).join(',')
+    const answer = q.multiAnswer ? `**[Answer:${answerLetters}]**` : `**[Answer: ${answerLetters}]**`
+    lines.push(answer)
     if (q.explanation) {
       lines.push(`**Explanation:** ${q.explanation}`)
     }

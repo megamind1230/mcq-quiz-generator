@@ -5,7 +5,7 @@ import type { McqDocument, McqQuestion } from '../types'
  * Format matches nextlearn's .mcq spec:
  *   YAML frontmatter (---...---)
  *   Question blocks separated by ---
- *   Each block: ## Question N, A/B/C/D options, **Answer:**, **Explanation:**
+ *   Each block: ## Question N, A/B/C/D options, **[Answer: X]**, **Explanation:**
  */
 export function parseMcqFile(content: string): McqDocument | null {
   const lines = content.split('\n')
@@ -82,8 +82,8 @@ function parseQuestionBlock(block: string): McqQuestion | null {
       continue
     }
 
-    // Answer line
-    const ansMatch = line.match(/^\*\*Answer:\*\*\s*(.*)/)
+    // Answer line: **[Answer: A]** or **[Answer:A,C]**
+    const ansMatch = line.match(/^\*\*\[Answer:\s*([A-D](?:\s*,\s*[A-D])*)\s*\]\*\*/i)
     if (ansMatch) {
       answerLine = ansMatch[1].trim()
       inExplanation = false
@@ -113,15 +113,27 @@ function parseQuestionBlock(block: string): McqQuestion | null {
   const question = questionLines.join('\n').trim()
   if (!question || options.length < 4 || !answerLine) return null
 
-  const answerIdx = answerLine.charCodeAt(0) - 65 // A=0, B=1, etc.
+  const correctIndices = parseAnswerList(answerLine).filter(i => i >= 0 && i < options.length)
+  if (correctIndices.length === 0) return null
   const explanation = explanationLines.join('\n').trim() || undefined
 
   return {
     question,
     options: options.map(o => o.trim()),
-    correctIndex: Math.max(0, Math.min(3, answerIdx)),
+    correctIndices,
+    multiAnswer: correctIndices.length > 1,
     explanation
   }
+}
+
+/** Parse an answer string like "B" or "A,C" into option indices. */
+export function parseAnswerList(answer: string): number[] {
+  return answer
+    .split(',')
+    .map(s => s.trim().toUpperCase())
+    .filter(Boolean)
+    .filter(s => /^[A-D]$/.test(s))
+    .map(s => s.charCodeAt(0) - 65)
 }
 
 function extractYamlField(fm: string, field: string): string {

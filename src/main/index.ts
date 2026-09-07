@@ -1,9 +1,11 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
-import { homedir } from 'os'
-import { readFile, writeFile, readdir, mkdir } from 'fs/promises'
+import { homedir, tmpdir } from 'os'
+import { readFile, writeFile, readdir, mkdir, rm } from 'fs/promises'
 import { existsSync } from 'fs'
 import { execFile, spawn } from 'child_process'
+import { decryptMcq, encryptMcq } from './crypto'
+import { getExportAssets } from './exportAssets'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -80,9 +82,19 @@ ipcMain.handle('dialog:openDirectory', async () => {
   return result.filePaths[0]
 })
 
+ipcMain.handle('dialog:saveFile', async (_event, opts: { defaultPath?: string; filters?: { name: string; extensions: string[] }[] }) => {
+  const result = await dialog.showSaveDialog({
+    defaultPath: opts?.defaultPath,
+    filters: opts?.filters
+  })
+  if (result.canceled || !result.filePath) return null
+  return result.filePath
+})
+
 ipcMain.handle('file:read', async (_event, filePath: string) => {
   try {
-    return await readFile(filePath, 'utf-8')
+    const content = await readFile(filePath, 'utf-8')
+    return decryptMcq(content)
   } catch (err) {
     await log(`Error reading ${filePath}: ${err}`)
     return null
@@ -117,11 +129,11 @@ ipcMain.handle('file:list', async (_event, dirPath: string, ext?: string) => {
 ipcMain.handle('file:mcqMetadata', async (_event, dirPath: string) => {
   try {
     const files = await readdir(dirPath, { withFileTypes: true })
-    const mcqFiles = files.filter(f => f.isFile() && f.name.endsWith('.mcq'))
+    const mcqFiles = files.filter(f => f.isFile() && (f.name.endsWith('.mcq') || f.name.endsWith('.emcq')))
     const results: { name: string; title: string; questionCount: number; generated: string }[] = []
     for (const f of mcqFiles) {
       try {
-        const content = await readFile(join(dirPath, f.name), 'utf-8')
+        const content = decryptMcq(await readFile(join(dirPath, f.name), 'utf-8')) || ''
         const frontmatter = content.split('---')[1] || ''
         const title = frontmatter.match(/^title:\s*(.+)$/m)?.[1] || f.name
         const generated = frontmatter.match(/^generated:\s*(.+)$/m)?.[1] || ''
@@ -143,6 +155,39 @@ ipcMain.handle('dir:ensure', async (_event, dirPath: string) => {
     await mkdir(dirPath, { recursive: true })
   }
   return true
+})
+
+ipcMain.handle('mcq:encrypt', async (_event, content: string) => {
+  return encryptMcq(content)
+})
+
+ipcMain.handle('mcq:decrypt', async (_event, content: string) => {
+  return decryptMcq(content)
+})
+
+ipcMain.handle('export:assets', async () => {
+  return getExportAssets()
+})
+
+ipcMain.handle('export:pdf', async (_event, html: string, outPath: string) => {
+  const tempDir = join(tmpdir(), 'mcq-export')
+  const htmlPath = join(tempDir, 'export.html')
+  try {
+    await mkdir(tempDir, { recursive: true })
+    await writeFile(htmlPath, html, 'utf-8')
+
+    const win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false, contextIsolation: true } })
+    await win.loadFile(htmlPath)
+    const pdf = await win.webContents.printToPDF({ printBackground: true })
+    win.destroy()
+    await writeFile(outPath, pdf)
+    await rm(tempDir, { recursive: true, force: true })
+    return true
+  } catch (err) {
+    await log(`Error exporting PDF: ${err}`)
+    await rm(tempDir, { recursive: true, force: true })
+    return false
+  }
 })
 
 ipcMain.handle('app:getPaths', () => ({

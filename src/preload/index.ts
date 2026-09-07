@@ -5,6 +5,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('dialog:openFile', filters),
   openDirectory: () =>
     ipcRenderer.invoke('dialog:openDirectory'),
+  saveFile: (opts?: { defaultPath?: string; filters?: { name: string; extensions: string[] }[] }) =>
+    ipcRenderer.invoke('dialog:saveFile', opts),
+  exportPdf: (html: string, outPath: string) =>
+    ipcRenderer.invoke('export:pdf', html, outPath),
+  exportAssets: () =>
+    ipcRenderer.invoke('export:assets'),
   readFile: (filePath: string) =>
     ipcRenderer.invoke('file:read', filePath),
   writeFile: (filePath: string, content: string) =>
@@ -15,6 +21,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('file:mcqMetadata', dirPath),
   ensureDir: (dirPath: string) =>
     ipcRenderer.invoke('dir:ensure', dirPath),
+  encryptMcq: (content: string) =>
+    ipcRenderer.invoke('mcq:encrypt', content),
+  decryptMcq: (content: string) =>
+    ipcRenderer.invoke('mcq:decrypt', content),
   log: (msg: string) =>
     ipcRenderer.invoke('log', msg),
   openExternal: (url: string) =>

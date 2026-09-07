@@ -12,7 +12,8 @@ describe('serializeMcq', () => {
         {
           question: 'What is 2 + 2?',
           options: ['3', '4', '5', '6'],
-          correctIndex: 1,
+          correctIndices: [1],
+          multiAnswer: false,
           explanation: 'Basic math.'
         }
       ]
@@ -27,7 +28,7 @@ describe('serializeMcq', () => {
     expect(output).toContain('What is 2 + 2?')
     expect(output).toContain('A. 3')
     expect(output).toContain('B. 4')
-    expect(output).toContain('**Answer:** B')
+    expect(output).toContain('**[Answer: B]**')
     expect(output).toContain('**Explanation:** Basic math.')
   })
 
@@ -40,7 +41,8 @@ describe('serializeMcq', () => {
         {
           question: 'Q?',
           options: ['a', 'b', 'c', 'd'],
-          correctIndex: 0
+          correctIndices: [0],
+          multiAnswer: false
         }
       ]
     }
@@ -61,13 +63,15 @@ describe('serializeMcq', () => {
         {
           question: 'Test question?',
           options: ['opt A', 'opt B', 'opt C', 'opt D'],
-          correctIndex: 2,
+          correctIndices: [2],
+          multiAnswer: false,
           explanation: 'Because.'
         },
         {
           question: 'Second one?',
           options: ['x', 'y', 'z', 'w'],
-          correctIndex: 0
+          correctIndices: [0],
+          multiAnswer: false
         }
       ]
     }
@@ -80,7 +84,26 @@ describe('serializeMcq', () => {
     expect(parsed!.source).toBe(doc.source)
     expect(parsed!.questions).toHaveLength(2)
     expect(parsed!.questions[0].question).toBe(doc.questions[0].question)
-    expect(parsed!.questions[0].correctIndex).toBe(doc.questions[0].correctIndex)
-    expect(parsed!.questions[1].correctIndex).toBe(doc.questions[1].correctIndex)
+    expect(parsed!.questions[0].correctIndices).toEqual(doc.questions[0].correctIndices)
+    expect(parsed!.questions[1].correctIndices).toEqual(doc.questions[1].correctIndices)
+  })
+
+  it('serializes multi-answer questions with bracket syntax', () => {
+    const doc: McqDocument = {
+      title: 'Multi',
+      source: 's.md',
+      generated: '2026-07-20',
+      questions: [
+        {
+          question: 'Pick primes?',
+          options: ['2', '4', '5', '9'],
+          correctIndices: [0, 2],
+          multiAnswer: true
+        }
+      ]
+    }
+
+    const output = serializeMcq(doc)
+    expect(output).toContain('**[Answer:A,C]**')
   })
 })

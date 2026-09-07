@@ -2,9 +2,15 @@
 #+DESCRIPTION: Known bugs and fix strategies for MCQ Quiz Generator
 
 * Current Bugs
-  No bugs reported yet.
+  - [O] Mobile PWA ships with no install/distribution story yet.  Students open
+        files via the in-app picker; native "Open with..." is deferred until a
+        Capacitor/APK build (see mobile plan-todos.org).
 
 * Fixed Bugs
+  - [X] Leave button not showing red (v0.4.0) -- the =secondary= button class
+        forces transparent background with =!important=, so the red Leave button
+        style was overridden.  Fixed by removing =secondary= from the Leave
+        button so the =var(--error)= background applies.
   - [X] Hardcoded developer-specific paths (v0.3.1) -- Config dir, MCQ output dir,
         and log dir were hardcoded to =/home/dt/...=.  Fixed by adding
         =app:getPaths= IPC handler using =app.getPath('userData')= and

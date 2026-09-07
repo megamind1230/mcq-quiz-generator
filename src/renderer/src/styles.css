@@ -4,8 +4,9 @@
   --border: #334155;
   --text: #f1f5f9;
   --text-dim: #94a3b8;
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
+  --accent: #7c0aed;
+  --accent-hover: #5d0ab5;
+  --amber: #ffb020;
   --success: #22c55e;
   --error: #ef4444;
   --warning: #f59e0b;
@@ -17,8 +18,9 @@
   --border: #e2e8f0;
   --text: #0f172a;
   --text-dim: #64748b;
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
+  --accent: #7c0aed;
+  --accent-hover: #5d0ab5;
+  --amber: #ffb020;
   --success: #16a34a;
   --error: #dc2626;
   --warning: #d97706;
@@ -57,7 +59,8 @@ body {
   padding: 8px 20px;
   border: none;
   background: transparent;
-  color: var(--text-dim);
+  color: var(--amber);
+  font-weight: 700;
   cursor: pointer;
   border-bottom: 2px solid transparent;
   transition: all 0.15s;
@@ -65,12 +68,12 @@ body {
 }
 
 .tab:hover {
-  color: var(--text);
+  color: var(--amber);
 }
 
 .tab.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
+  color: var(--amber);
+  border-bottom-color: var(--amber);
 }
 
 .content {
@@ -340,6 +343,39 @@ hr {
   color: var(--text-dim);
 }
 
+.tag {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
+}
+
+.tag-single {
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.tag-multi {
+  color: #fff;
+  background: #6a5acd;
+  border: 1px solid #6a5acd;
+}
+
+.quiz-hint {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-style: italic;
+  margin: -8px 0 12px;
+}
+
+.option-card .marker {
+  display: inline-block;
+  width: 1.1em;
+  margin-right: 6px;
+  font-size: 1.05em;
+}
+
 .quiz-question {
   padding: 20px;
   background: var(--surface);
@@ -466,14 +502,31 @@ hr {
   justify-content: space-between;
 }
 
+.leave-btn {
+  padding: 8px 16px;
+  color: #fff;
+  background: var(--error);
+  border: 1px solid var(--error);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.leave-btn:hover:not(:disabled) {
+  background: var(--error);
+  border-color: var(--error);
+  filter: brightness(1.1);
+}
+
 .quiz-nav button:not(.secondary) {
-  background: #7C0AED;
-  border-color: #7C0AED;
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .quiz-nav button:not(.secondary):hover:not(:disabled) {
-  background: #6908C9;
-  border-color: #6908C9;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .quiz-results {

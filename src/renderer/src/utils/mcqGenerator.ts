@@ -1,4 +1,5 @@
 import type { McqDocument, McqQuestion } from '../types'
+import { parseAnswerList } from './mcqParser'
 
 const MODEL_FALLBACK = [
   'gemini-2.5-flash',
@@ -12,7 +13,29 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4)
 }
 
-export function buildPrompt(content: string, questionCount: number): string {
+export function buildPrompt(content: string, questionCount: number, multiAnswer = false): string {
+  const answerFormat = multiAnswer
+    ? `**[Answer:A,C]**` // two or more correct options, comma-separated, no space
+    : `**[Answer: B]**`   // exactly one correct option
+
+  const rules = multiAnswer
+    ? `- Each question must have exactly 4 options (A, B, C, D)
+- Mark TWO or MORE answers as correct per question using the format **[Answer:A,C]**
+- The correct options must be comma-separated WITHOUT a space inside the brackets
+- Make sure every correct letter is actually correct, and every uncorrected one is wrong
+- Distractors should be plausible but clearly wrong
+- Use --- on its own line as a separator between questions
+- Do NOT use any markdown code fences
+- Cover EVERY section of the content -- do not skip any part
+- Generate exactly ${questionCount} questions`
+    : `- Each question must have exactly 4 options (A, B, C, D)
+- Make sure exactly one answer is correct
+- Distractors should be plausible but clearly wrong
+- Use --- on its own line as a separator between questions
+- Do NOT use any markdown code fences
+- Cover EVERY section of the content -- do not skip any part
+- Generate exactly ${questionCount} questions`
+
   return `You are an educator creating multiple-choice questions from study material.
 Given the deck content below, create ${questionCount} questions.
 
@@ -26,19 +49,13 @@ B. {option B}
 C. {option C}
 D. {option D}
 
-**Answer:** A
+${answerFormat}
 **Explanation:** {why this is correct}
 
 ---
 
 Rules:
-- Each question must have exactly 4 options (A, B, C, D)
-- Make sure exactly one answer is correct
-- Distractors should be plausible but clearly wrong
-- Use --- on its own line as a separator between questions
-- Do NOT use any markdown code fences
-- Cover EVERY section of the content -- do not skip any part
-- Generate exactly ${questionCount} questions
+${rules}
 
 Deck content:
 ---
@@ -64,7 +81,8 @@ export async function generateMcqs(
   questionCount: number,
   apiKey: string,
   sourceFileName: string,
-  onProgress?: (msg: string) => void
+  onProgress?: (msg: string) => void,
+  multiAnswer = false
 ): Promise<McqDocument> {
   const tokens = estimateTokens(content)
   onProgress?.(`Estimating tokens... ~${tokens.toLocaleString()}`)
@@ -76,7 +94,7 @@ export async function generateMcqs(
   const maxChars = 700000 * 4
   const truncated = content.length > maxChars ? content.slice(0, maxChars) : content
 
-  const prompt = buildPrompt(truncated, questionCount)
+  const prompt = buildPrompt(truncated, questionCount, multiAnswer)
   onProgress?.('Prompt built, trying models...')
 
   // ── Try model fallback chain ─────────────────────────────────
@@ -199,7 +217,7 @@ function parseGeneratedBlock(block: string): McqQuestion | null {
   const questionLines: string[] = []
   const options: string[] = []
   let currentOption = -1
-  let answerIdx = -1
+  let answerLine = ''
   let explanationLines: string[] = []
   let inExplanation = false
 
@@ -213,9 +231,9 @@ function parseGeneratedBlock(block: string): McqQuestion | null {
       continue
     }
 
-    const ansMatch = line.match(/^\*\*Answer:\*\*\s*([A-D])/)
+    const ansMatch = line.match(/^\[\*\*Answer:\s*([A-D](?:\s*,\s*[A-D])*)\s*\*\*\]/i)
     if (ansMatch) {
-      answerIdx = ansMatch[1].charCodeAt(0) - 65
+      answerLine = ansMatch[1].trim()
       inExplanation = false
       continue
     }
@@ -237,12 +255,16 @@ function parseGeneratedBlock(block: string): McqQuestion | null {
   }
 
   const question = questionLines.join('\n').trim()
-  if (!question || options.length < 4 || answerIdx < 0) return null
+  if (!question || options.length < 4 || !answerLine) return null
+
+  const correctIndices = parseAnswerList(answerLine).filter(i => i >= 0 && i < options.length)
+  if (correctIndices.length === 0) return null
 
   return {
     question,
     options: options.slice(0, 4).map(o => o.trim()),
-    correctIndex: answerIdx,
+    correctIndices,
+    multiAnswer: correctIndices.length > 1,
     explanation: explanationLines.join('\n').trim() || undefined
   }
 }

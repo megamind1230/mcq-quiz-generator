@@ -7,6 +7,9 @@ export const DEFAULTS: AppSettings = {
   mcqOutputDir: '',
   theme: 'dark',
   instantFeedback: false,
+  randomizeOptions: true,
+  randomizeQuestionOrder: true,
+  encryptOutput: false,
   fileManager: 'xdg-open'
 }
 

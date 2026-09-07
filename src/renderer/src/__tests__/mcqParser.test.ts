@@ -17,7 +17,7 @@ B. 4
 C. 5
 D. 6
 
-**Answer:** B
+**[Answer: B]**
 **Explanation:** Basic arithmetic.
 
 ---
@@ -30,7 +30,7 @@ B. Berlin
 C. Paris
 D. Madrid
 
-**Answer:** C
+**[Answer: C]**
 `
 
     const result = parseMcqFile(input)
@@ -42,11 +42,13 @@ D. Madrid
 
     expect(result!.questions[0].question).toBe('What is 2 + 2?')
     expect(result!.questions[0].options).toEqual(['3', '4', '5', '6'])
-    expect(result!.questions[0].correctIndex).toBe(1)
+    expect(result!.questions[0].correctIndices).toEqual([1])
+    expect(result!.questions[0].multiAnswer).toBe(false)
     expect(result!.questions[0].explanation).toBe('Basic arithmetic.')
 
     expect(result!.questions[1].question).toBe('Capital of France?')
-    expect(result!.questions[1].correctIndex).toBe(2)
+    expect(result!.questions[1].correctIndices).toEqual([2])
+    expect(result!.questions[1].multiAnswer).toBe(false)
     expect(result!.questions[1].explanation).toBeUndefined()
   })
 
@@ -71,7 +73,7 @@ B. 2
 C. 3
 D. 4
 
-**Answer:** A
+**[Answer: A]**
 `
     const result = parseMcqFile(input)
     expect(result).not.toBeNull()
@@ -93,7 +95,7 @@ B. 2
 C. 3
 D. 4
 
-**Answer:** B
+**[Answer: B]**
 `
     const result = parseMcqFile(input)
     expect(result!.title).toBe('My Quiz')
@@ -113,7 +115,7 @@ B. 2
 C. 3
 D. 4
 
-**Answer:** A
+**[Answer: A]**
 
 ---
 
@@ -129,9 +131,31 @@ B. b
 C. c
 D. d
 
-**Answer:** C
+**[Answer: C]**
 `
     const result = parseMcqFile(input)
     expect(result!.questions).toHaveLength(2)
+  })
+
+  it('parses multi-answer syntax', () => {
+    const input = `---
+title: Multi
+source: multi.md
+---
+
+## Question 1
+Select prime numbers
+
+A. 2
+B. 4
+C. 5
+D. 9
+
+**[Answer:A,C]**
+`
+    const result = parseMcqFile(input)
+    expect(result).not.toBeNull()
+    expect(result!.questions[0].correctIndices).toEqual([0, 2])
+    expect(result!.questions[0].multiAnswer).toBe(true)
   })
 })

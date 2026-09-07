@@ -4,7 +4,7 @@ import { buildPrompt } from '../utils/mcqGenerator'
 
 export default function Settings() {
   const { draft, setDraft, save, reset, dirty } = useSettings()
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<'' | 'single' | 'multi'>('')
   const [fmError, setFmError] = useState(false)
 
   const handlePickDir = async () => {
@@ -12,11 +12,11 @@ export default function Settings() {
     if (dir) setDraft({ mcqOutputDir: dir })
   }
 
-  const handleCopyPrompt = async () => {
-    const prompt = buildPrompt('{your content here}', 10)
+  const handleCopyPrompt = async (multiAnswer = false) => {
+    const prompt = buildPrompt('{your content here}', 10, multiAnswer)
     await navigator.clipboard.writeText(prompt)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopied(multiAnswer ? 'multi' : 'single')
+    setTimeout(() => setCopied(''), 2000)
   }
 
   const handleOpenDir = async () => {
@@ -140,14 +140,55 @@ export default function Settings() {
 
       <hr />
 
+      <div className="setting" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <label style={{ margin: 0 }}>Randomize answer order</label>
+        <input
+          type="checkbox"
+          checked={draft.randomizeOptions}
+          onChange={e => setDraft({ randomizeOptions: e.target.checked })}
+        />
+      </div>
+
+      <div className="setting" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <label style={{ margin: 0 }}>Randomize question order</label>
+        <input
+          type="checkbox"
+          checked={draft.randomizeQuestionOrder}
+          onChange={e => setDraft({ randomizeQuestionOrder: e.target.checked })}
+        />
+      </div>
+
+      <hr />
+
+      <div className="setting" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <label style={{ margin: 0 }}>
+          Encrypt generated quizzes
+          <span style={{ display: 'block', fontSize: 12, color: 'var(--text-dim)', fontWeight: 400 }}>
+            Saves as .emcq so students can't read answers in an editor. The app opens it seamlessly.
+          </span>
+        </label>
+        <input
+          type="checkbox"
+          checked={draft.encryptOutput}
+          onChange={e => setDraft({ encryptOutput: e.target.checked })}
+        />
+      </div>
+
+      <hr />
+
       <div className="setting">
-        <label>AI Prompt Template</label>
+        <label>AI Prompt Templates</label>
         <p style={{ fontSize: 13, color: 'var(--text-dim)', margin: '0 0 8px' }}>
-          Copy the prompt template to paste into any AI agent.
+          Copy a prompt template to paste into any AI agent.
         </p>
-        <button className="secondary" onClick={handleCopyPrompt}>
-          {copied ? 'Copied!' : 'Copy Prompt to Clipboard'}
-        </button>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="secondary" onClick={() => handleCopyPrompt(false)}>
+            {copied === 'single' ? 'Copied!' : 'Copy Single-answer Prompt'}
+          </button>
+          <button className="secondary" onClick={() => handleCopyPrompt(true)}>
+            {copied === 'multi' ? 'Copied!' : 'Copy Multi-answer Prompt'}
+          </button>
+        </div>
       </div>
 
       <div className="controls" style={{ marginTop: 16 }}>

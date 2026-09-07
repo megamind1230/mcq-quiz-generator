@@ -62,3 +62,23 @@ Inspired by [[https://github.com/megamind1230/nextlearn][megamind1230/nextlearn]
   - [X] Fixed YAML parser colon handling -- quoted values with colons now work
   - [X] Added question count JS validation (clamp 1-50)
   - [X] Fixed org parser to skip block content between BEGIN/END
+
+* v0.4.0 - 2026-08-31
+  Multi-answer questions + security + companion mobile PWA.
+  - [X] Multi-answer support: =.mcq= files can now have several correct options
+  - [X] New (breaking) multi-answer syntax: =**[Answer:A,C]=** -- comma-separated
+        letters, *no space* after the colon (single stays =**[Answer: B]=**)
+  - [X] =McqQuestion= gained =correctIndices: number[]= and =multiAnswer=;
+        grading is exact-match set equality (all-or-nothing)
+  - [X] Generator supports multi-answer mode (=buildPrompt=, =generateMcqs=)
+        with select-all prompts
+  - [X] Quiz UI: checkbox markers for multi, radio for single; "Single answer"
+        / "Select all that apply" tags; results show Your/Correct Answer(s)
+  - [X] Optional AES-256-GCM encrypted output (=.emcq=) with app-embedded key;
+        app opens both =.mcq= and =.emcq= seamlessly
+  - [X] Leave button in quiz header (red, =← Leave=, confirm dialog)
+  - [X] Tabs styled with amber active underline (=--amber= var)
+  - [X] Tests rewritten/extended -- now 38 tests across 6 files
+  - [X] Repository renamed =mcq-quiz-generator= -> =mcq-quiz-generator-desktop=
+  - [X] New companion project =mcq-quiz-generator-mobile=: offline student PWA
+        that imports, decrypts, and grades =.mcq=/=.emcq= files (no generation)

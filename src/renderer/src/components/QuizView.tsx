@@ -3,6 +3,8 @@ import { useSettings } from '../SettingsContext'
 import { parseMcqFile } from '../utils/mcqParser'
 import { logQuizResult } from '../utils/quizLogger'
 import { renderRichText, getRawContent, clearRawContentMap } from '../utils/renderRichText'
+import { shuffle } from '../utils/shuffle'
+import { buildExport, buildHtml, formatExtension, type ExportData, type ExportFormat } from '../utils/quizExporter'
 import { getDefaultMcqDir } from '../utils/settings'
 import type { McqDocument, McqQuestion } from '../types'
 
@@ -24,6 +26,8 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
   const [questions, setQuestions] = useState<McqQuestion[]>([])
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportMsg, setExportMsg] = useState<string | null>(null)
 
   // ── Load file list ───────────────────────────────────────────
   const loadFiles = async () => {
@@ -46,7 +50,21 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
     if (!parsed) return
 
     setDoc(parsed)
-    setQuestions(parsed.questions.map(q => ({ ...q, selectedIndex: undefined })))
+
+    let questions = parsed.questions.map(q => {
+      if (settings.randomizeOptions) {
+        const optionOrder = shuffle(q.options.map((_, i) => i))
+        return {
+          ...q,
+          options: optionOrder.map(i => q.options[i]),
+          correctIndices: q.correctIndices.map(idx => optionOrder.indexOf(idx))
+        }
+      }
+      return { ...q }
+    })
+    if (settings.randomizeQuestionOrder) questions = shuffle(questions)
+    setQuestions(questions.map(q => ({ ...q, selectedIndices: undefined })))
+
     setCurrentIdx(0)
     setElapsed(0)
     setState('active')
@@ -70,11 +88,19 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
 
   // ── Answer selection ─────────────────────────────────────────
   const selectAnswer = (optIdx: number) => {
-    if (questions[currentIdx].selectedIndex !== undefined) return // already answered
-
     setQuestions(prev => {
       const next = [...prev]
-      next[currentIdx] = { ...next[currentIdx], selectedIndex: optIdx }
+      const cur = next[currentIdx]
+      if (cur.multiAnswer) {
+        const curSel = cur.selectedIndices || []
+        const newSel = curSel.includes(optIdx)
+          ? curSel.filter(i => i !== optIdx)
+          : [...curSel, optIdx]
+        next[currentIdx] = { ...cur, selectedIndices: newSel.length ? newSel : undefined }
+      } else {
+        const newSel = cur.selectedIndices?.[0] === optIdx ? undefined : [optIdx]
+        next[currentIdx] = { ...cur, selectedIndices: newSel }
+      }
       return next
     })
   }
@@ -97,7 +123,7 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
     if (timerRef.current) clearInterval(timerRef.current)
 
     // Log result
-    const correct = questions.filter(q => q.selectedIndex === q.correctIndex).length
+    const correct = questions.filter(q => exactMatch(q)).length
     logQuizResult({
       timestamp: new Date().toISOString(),
       title: doc?.title || 'Unknown',
@@ -108,6 +134,45 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
     })
 
     setState('results')
+  }
+
+  // ── Export results ────────────────────────────────────────────
+  const handleExport = async (format: ExportFormat) => {
+    if (!doc) return
+    setExportOpen(false)
+    setExportMsg(null)
+
+    const correct = questions.filter(q => exactMatch(q)).length
+    const data: ExportData = {
+      title: doc.title,
+      correct,
+      total: questions.length,
+      timeTakenSeconds: elapsed,
+      questions
+    }
+
+    const safeTitle = (doc.title || 'quiz').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'quiz'
+    const defaultPath = `${safeTitle}-results.${formatExtension(format)}`
+    const filters = [{ name: format.toUpperCase(), extensions: [formatExtension(format)] }]
+
+    const outPath = await window.electronAPI.saveFile({ defaultPath, filters })
+    if (!outPath) return
+
+    try {
+      if (format === 'pdf') {
+        const assets = await window.electronAPI.exportAssets()
+        const ok = await window.electronAPI.exportPdf(buildHtml(data, assets), outPath)
+        if (!ok) { setExportMsg('Failed to export PDF'); return }
+      } else {
+        const css = (format === 'html') ? await window.electronAPI.exportAssets() : undefined
+        await window.electronAPI.writeFile(outPath, buildExport(format, data, css))
+      }
+      setExportMsg(`Exported to ${outPath}`)
+      await window.electronAPI.log(`Exported ${format} results to ${outPath}`)
+    } catch (err) {
+      setExportMsg('Export failed')
+      await window.electronAPI.log(`Export error: ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
 
   // ── Keyboard shortcuts ───────────────────────────────────────
@@ -199,33 +264,50 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
   // ── Render: active quiz ──────────────────────────────────────
   if (state === 'active' && doc) {
     const q = questions[currentIdx]
-    const answered = q.selectedIndex !== undefined
-    const isCorrect = answered && q.selectedIndex === q.correctIndex
-    const allAnswered = questions.every(q => q.selectedIndex !== undefined)
+    const answered = isAnswered(q)
+    const isCorrect = answered && exactMatch(q)
+    const allAnswered = questions.every(isAnswered)
     const labels = ['A', 'B', 'C', 'D']
+    const multi = q.multiAnswer
 
     return (
       <div className="quiz-container">
         <div className="quiz-header">
+          <button className="leave-btn" onClick={() => {
+            if (!confirm('Leave quiz? Your progress will be lost.')) return
+            if (timerRef.current) clearInterval(timerRef.current)
+            clearRawContentMap()
+            setState('list')
+          }}>
+            ← Leave
+          </button>
           <span className="quiz-progress">
             Question {currentIdx + 1} of {questions.length}
           </span>
+          {multi ? (
+            <span className="tag tag-multi">Select all that apply</span>
+          ) : (
+            <span className="tag tag-single">Single answer</span>
+          )}
           <span className="quiz-timer">{formatTime(elapsed)}</span>
         </div>
 
         <div className="quiz-question" dangerouslySetInnerHTML={{ __html: renderRichText(q.question) }} />
+        {multi && <div className="quiz-hint">Choose one or more correct options.</div>}
 
         <div className="quiz-options">
           {q.options.map((opt, i) => {
-            let cls = 'option-card'
+            const isSelected = !!q.selectedIndices?.includes(i)
+            let cls = multi ? 'option-card option-card-check' : 'option-card option-card-radio'
             if (answered && settings.instantFeedback) {
-              if (i === q.correctIndex) cls += ' correct'
-              else if (i === q.selectedIndex) cls += ' wrong'
-            } else if (i === q.selectedIndex) {
+              if (q.correctIndices.includes(i)) cls += ' correct'
+              else if (isSelected) cls += ' wrong'
+            } else if (isSelected) {
               cls += ' selected'
             }
             return (
               <button key={i} className={cls} onClick={() => selectAnswer(i)}>
+                <span className="marker">{multi ? (isSelected ? '☑' : '☐') : (isSelected ? '●' : '○')}</span>
                 <span className="label">{labels[i]}.</span>{' '}
                 <span dangerouslySetInnerHTML={{ __html: renderRichText(opt) }} />
               </button>
@@ -241,13 +323,6 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
         )}
 
         <div className="quiz-nav">
-          <button className="secondary" onClick={() => {
-            if (timerRef.current) clearInterval(timerRef.current)
-            clearRawContentMap()
-            setState('list')
-          }}>
-            ← Back
-          </button>
           <button className="secondary" onClick={goPrev} disabled={currentIdx === 0}>
             Previous
           </button>
@@ -265,7 +340,7 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
 
   // ── Render: results ──────────────────────────────────────────
   if (state === 'results' && doc) {
-    const correct = questions.filter(q => q.selectedIndex === q.correctIndex).length
+    const correct = questions.filter(q => exactMatch(q)).length
     const total = questions.length
     const pct = Math.round((correct / total) * 100)
     const scoreClass = pct >= 80 ? 'good' : pct >= 50 ? 'ok' : 'bad'
@@ -282,24 +357,26 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
         <div style={{ textAlign: 'left', marginTop: 24 }}>
           {questions.map((q, i) => {
             const labels = ['A', 'B', 'C', 'D']
-            const correct = q.selectedIndex === q.correctIndex
-            const skipped = q.selectedIndex === undefined
+            const right = exactMatch(q)
+            const selectedTxt = q.selectedIndices ? q.selectedIndices.map(i => labels[i]).join(', ') : ''
+            const answerTxt = q.correctIndices.map(i => labels[i]).join(', ')
+            const marker = right ? '✅' : '❌'
+            const markerColor = right ? 'var(--success)' : 'var(--error)'
             return (
               <div key={i} className="preview-question" style={{ marginBottom: 12 }}>
                 <p className="q-text" dangerouslySetInnerHTML={{ __html: `${i + 1}. ${renderRichText(q.question)}` }} />
                 <p style={{ fontSize: 13, marginTop: 4 }}>
-                  {skipped ? (
-                    <span style={{ color: 'var(--warning)' }}>Skipped</span>
-                  ) : correct ? (
-                    <span style={{ color: 'var(--success)' }}>Correct ({labels[q.selectedIndex!]})</span>
-                  ) : (
-                    <span style={{ color: 'var(--error)' }}>
-                      Wrong ({labels[q.selectedIndex!]}) — Answer: {labels[q.correctIndex]}
-                    </span>
-                  )}
+                  <strong>Your Answer(s) ==&gt;</strong> {selectedTxt}
+                </p>
+                <p style={{ fontSize: 13, marginTop: 2 }}>
+                  <strong>Correct Answer(s) ==&gt;</strong> {answerTxt}{' '}
+                  <span style={{ color: markerColor }}>{marker}</span>
                 </p>
                 {q.explanation && (
-                  <div style={{ fontSize: 13, marginTop: 4, color: 'var(--muted)' }} dangerouslySetInnerHTML={{ __html: renderRichText(q.explanation) }} />
+                  <div style={{ fontSize: 13, marginTop: 4, color: 'var(--muted)' }}>
+                    <strong>Explanation:</strong>{' '}
+                    <span dangerouslySetInnerHTML={{ __html: renderRichText(q.explanation) }} />
+                  </div>
                 )}
               </div>
             )
@@ -307,8 +384,34 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
         </div>
 
         <div className="results-actions">
+          <div className="export-menu" style={{ position: 'relative', display: 'inline-block' }}>
+            <button className="secondary" onClick={() => { setExportMsg(null); setExportOpen(o => !o) }}>
+              Export ▾
+            </button>
+            {exportOpen && (
+              <div className="export-dropdown" style={{ position: 'absolute', bottom: 44, left: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, zIndex: 10, minWidth: 140, overflow: 'hidden' }}>
+                {(['pdf', 'html', 'org', 'md', 'txt'] as ExportFormat[]).map(f => (
+                  <button
+                    key={f}
+                    className="export-item"
+                    onClick={() => handleExport(f)}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text)', padding: '8px 12px', cursor: 'pointer', fontSize: 14 }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent)' }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'none' }}
+                  >
+                    .{formatExtension(f)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button onClick={() => { clearRawContentMap(); setState('list'); loadFiles() }}>Back to Quiz List</button>
         </div>
+        {exportMsg && (
+          <p style={{ fontSize: 13, marginTop: 8, color: exportMsg.includes('Failed') ? 'var(--error)' : 'var(--success)' }}>
+            {exportMsg}
+          </p>
+        )}
       </div>
     )
   }
@@ -320,4 +423,15 @@ function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function exactMatch(q: McqQuestion): boolean {
+  if (!q.selectedIndices || q.selectedIndices.length === 0) return false
+  const a = [...q.selectedIndices].sort().join(',')
+  const b = [...q.correctIndices].sort().join(',')
+  return a === b
+}
+
+function isAnswered(q: McqQuestion): boolean {
+  return !!(q.selectedIndices && q.selectedIndices.length > 0)
 }
