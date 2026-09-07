@@ -80,12 +80,12 @@ export function renderRichText(text: string): string {
   s = s.replace(/\$([^\$\n]+?)\$/g, (_, tex) => {
     const trimmed = tex.trim()
     const id = store(trimmed)
-    return hold(`<span class="inline-math" data-copy-id="${id}">${renderLatex(trimmed, false)}</span>`)
+    return hold(`<span class="inline-math" data-copy-id="${id}">${renderLatex(trimmed, false)}</span>&thinsp;`)
   })
   s = s.replace(/\\\(([\s\S]*?)\\\)/g, (_, tex) => {
     const trimmed = tex.trim()
     const id = store(trimmed)
-    return hold(`<span class="inline-math" data-copy-id="${id}">${renderLatex(trimmed, false)}</span>`)
+    return hold(`<span class="inline-math" data-copy-id="${id}">${renderLatex(trimmed, false)}</span>&thinsp;`)
   })
 
   // 5. Escape remaining HTML, restore placeholders
