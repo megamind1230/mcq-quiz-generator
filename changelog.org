@@ -3,6 +3,23 @@
 
 Inspired by [[https://github.com/megamind1230/nextlearn][megamind1230/nextlearn]] MCQ feature.
 
+* v0.5.0 - 2026-09-08
+  Loop mode, bulk encrypt, settings expansion, quality-of-life.
+  - [X] *Loop mode:* retakes wrong answers in batches of 15 until all mastered;
+        instant feedback forced on; no results page; mode picker overlay after
+        selecting a quiz (Loop vs Normal, always asks fresh)
+  - [X] *Mode picker overlay* -- Choose Loop or Normal mode before each quiz
+  - [X] *Bulk encrypt:* Generate tab has "Bulk Encrypt .mcq -> .emcq" button
+        that encrypts all unencrypted =.mcq= files in the output directory
+  - [X] *Settings expansion:* added Randomize Options, Randomize Question Order,
+        Encrypt Output toggles; instant feedback hint ("Always on in Loop Mode")
+  - [X] *Remember last file picker directory* -- file dialog opens where you left off
+  - [X] *AI prompt keyword constraint:* prompt template now tells the AI not to
+        translate =## Question=, =**[Answer: ...]**=, =**Explanation:**=, =A.=, =B.=, =C.=, =D.=
+  - [X] Extracted =quizModes.ts= (grading + loop logic) with unit tests (45 total)
+  - [X] Renamed =plan-todos.org= -> =plans-and-todos.org=
+  - [X] README.org updated: rich .mcq examples (LaTeX, code), new features documented
+
 * v0.1.0 - 2026-07-18
   Initial scaffold.
   - [X] Electron + React + TypeScript project setup
@@ -43,7 +60,7 @@ Inspired by [[https://github.com/megamind1230/nextlearn][megamind1230/nextlearn]
   - [X] Esc/q keyboard shortcut to quit quiz back to Take Quiz page
   - [X] Fixed: instant feedback setting was completely ignored
   - [X] Fixed: inline math/code copy broken (KaTeX child element issue)
-  - [X] Updated README.org, plan-todos.org, bugs.org, changelog.org
+  - [X] Updated README.org, plans-and-todos.org, bugs.org, changelog.org
 
 * v0.3.1 - 2026-07-20
   Bug fixes.

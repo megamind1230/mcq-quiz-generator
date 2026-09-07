@@ -27,7 +27,7 @@ This project ports the core concept (AI generation, =.mcq= file format,
   Logs tab -- quiz history with scores and timing.
 
   [[file:screenshots/settings.png]]
-  Settings -- API key, output directory, theme, feedback toggle.
+  Settings -- API key, output directory, theme, feedback, shuffle, encrypt toggles.
 
 * Features
 
@@ -45,14 +45,20 @@ This project ports the core concept (AI generation, =.mcq= file format,
     app-embedded key so students can't read answers in a text editor. The app
     opens both =.mcq= and =.emcq= seamlessly; no plaintext temp files are written.
     (Obfuscation against casual reading, not unbreakable security)
+  - Bulk encrypt: encrypt all =.mcq= files in the output directory that lack
+    a matching =.emcq= (Bulk Encrypt button in Generate tab)
 
 ** Quiz
   - One question at a time with clickable option cards
     - *Single answer:* radio-style markers (=●=/=○=), "Single answer" tag
     - *Multi answer:* checkbox-style markers (=☑=/=☐=), "Select all that apply"
       tag and a hint; graded by exact match (all-or-nothing)
+  - *Mode picker:* after selecting a quiz, choose *Loop Mode* (retakes wrong
+    answers in batches of 15 until all mastered; instant feedback forced on;
+    no results page) or *Normal Mode* (standard quiz with results page)
   - Count-up timer
-  - Instant feedback toggle (show correct/wrong on click, or only at results)
+  - Instant feedback toggle (show correct/wrong on click, or only at results;
+    forced on in Loop Mode)
   - Explanation display after each answer
   - Next/Previous navigation
   - =← Back= button to quit to quiz list
@@ -91,6 +97,7 @@ This project ports the core concept (AI generation, =.mcq= file format,
   - File manager selector (26 Linux file managers supported)
   - Quiz history table (date, title, score, questions, time)
   - Frameless window with custom title bar
+  - Remembers last opened file picker directory
 
 * Prerequisites
   - Node.js 18+ and npm
@@ -110,6 +117,7 @@ This project ports the core concept (AI generation, =.mcq= file format,
   3. Set question count, click *Generate MCQs*
   4. Preview, then *Save .mcq File*
   5. Go to *Quiz* tab, click the saved quiz to start
+  6. Choose *Loop Mode* or *Normal Mode* in the mode picker
 
 * Available Scripts
 
@@ -146,14 +154,15 @@ This project ports the core concept (AI generation, =.mcq= file format,
   │           ├── utils/
   │           │   ├── mcqParser.ts      # .mcq -> McqDocument
   │           │   ├── mcqWriter.ts      # McqDocument -> .mcq
-  │           │   ├── mcqGenerator.ts   # Gemini API calls
+  │           │   ├── mcqGenerator.ts   # Gemini API calls + prompt templates
+  │           │   ├── quizModes.ts      # Loop mode logic + grading
   │           │   ├── inputParser.ts    # .txt/.md/.org -> plain text
   │           │   ├── renderRichText.ts # KaTeX + highlight.js
   │           │   ├── settings.ts       # Load/save settings
   │           │   └── quizLogger.ts     # localStorage results
   │           └── __tests__/            # Unit tests (vitest)
   ├── out/                   # Built output (gitignored)
-  ├── plan-todos.org         # Implementation plan
+  ├── plans-and-todos.org     # Implementation plan
   ├── bugs.org               # Known bugs and fixes
   ├── changelog.org          # Version history
   └── README.org
@@ -209,6 +218,7 @@ This project ports the core concept (AI generation, =.mcq= file format,
   - Do NOT use any markdown code fences
   - Cover EVERY section of the content -- do not skip any part
   - Generate exactly {questionCount} questions
+  - Do NOT translate or modify these exact keywords: ## Question, **[Answer: ...]**, **Explanation:**, A., B., C., D.  The app parser depends on them.
   #+END_EXAMPLE
 
   *Multi-answer* variant is identical except it uses the =**[Answer:A,C]=**
@@ -257,34 +267,54 @@ This project ports the core concept (AI generation, =.mcq= file format,
 
   #+BEGIN_SRC markdown
   ---
-  title: Algebra Quiz
-  source: algebra.md
-  generated: 2026-07-18 14:30
+  title: Physics Quiz
+  source: physics.md
+  generated: 2026-08-01 10:00
   ---
 
   ## Question 1
-  What is 2 + 2?
+  What is the integral of $f(x) = 3x^2$ from 0 to 1?
 
-  A. 3
-  B. 4
-  C. 5
-  D. 6
+  A. 0
+  B. 1
+  C. 2
+  D. 3
 
   **[Answer: B]**
-  **Explanation:** 2 + 2 = 4. Basic arithmetic.
+  **Explanation:** $\int_0^1 3x^2\,dx = \left[x^3\right]_0^1 = 1$.
 
   ---
 
   ## Question 2
-  Which of the following are even numbers?
+  What does this Python function return?
 
-  A. 2
-  B. 3
-  C. 6
-  D. 9
+  ```python
+  def fib(n):
+      if n <= 1:
+          return n
+      return fib(n - 1) + fib(n - 2)
+  ```
+
+  A. The sum of 1 to n
+  B. The nth Fibonacci number
+  C. The factorial of n
+  D. The nth prime number
+
+  **[Answer: B]**
+  **Explanation:** `fib(n)` recursively computes Fibonacci numbers: `fib(0)=0, fib(1)=1, fib(n)=fib(n-1)+fib(n-2)`.
+
+  ---
+
+  ## Question 3
+  Which of the following are prime numbers?
+
+  A. 7
+  B. 9
+  C. 13
+  D. 15
 
   **[Answer:A,C]**
-  **Explanation:** 2 and 6 are even.
+  **Explanation:** 7 and 13 are prime. 9 = 3x3 and 15 = 3x5 are composite.
   #+END_SRC
 
 ** Rich text in questions
@@ -300,13 +330,16 @@ This project ports the core concept (AI generation, =.mcq= file format,
 
   Accessible from the Settings tab:
 
-  | Setting          | Description                                          |
-  |------------------+------------------------------------------------------|
-  | Gemini API Key   | Required for AI generation. Free at AI Studio.       |
-  | MCQ Output Dir   | Where =.mcq= files are saved. Default: =~/magnus/mcq-quiz-generator/mcqs= |
-  | File Manager     | File manager to open directories (26 options)        |
-  | Theme            | Dark / light mode                                    |
-  | Instant Feedback | Show correct/wrong on click (on) or only at results (off) |
+  | Setting                | Description                                          |
+  |------------------------+------------------------------------------------------|
+  | Gemini API Key         | Required for AI generation. Free at AI Studio.       |
+  | MCQ Output Dir         | Where =.mcq= files are saved. Default: =~/magnus/mcq-quiz-generator/mcqs= |
+  | File Manager           | File manager to open directories (26 options)        |
+  | Theme                  | Dark / light mode                                    |
+  | Instant Feedback       | Show correct/wrong on click (forced on in Loop Mode) |
+  | Randomize Options      | Shuffle answer order per question                    |
+  | Randomize Q Order      | Shuffle question order each quiz                     |
+  | Encrypt Output         | Save =.emcq= alongside =.mcq= (obfuscation)         |
 
 * Logs
 
@@ -334,6 +367,6 @@ This project ports the core concept (AI generation, =.mcq= file format,
   npm run lint         # lint
   #+END_SRC
 
-  - Keep =bugs.org=, =changelog.org=, =plan-todos.org= in sync
+  - Keep =bugs.org=, =changelog.org=, =plans-and-todos.org= in sync
   - Run =npm test= before committing
   - Follow existing code style (no new dependencies without good reason)

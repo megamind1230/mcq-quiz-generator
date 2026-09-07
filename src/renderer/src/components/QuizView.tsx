@@ -6,6 +6,7 @@ import { renderRichText, getRawContent, clearRawContentMap } from '../utils/rend
 import { shuffle } from '../utils/shuffle'
 import { buildExport, buildHtml, formatExtension, type ExportData, type ExportFormat } from '../utils/quizExporter'
 import { getDefaultMcqDir } from '../utils/settings'
+import { advanceLoop, BLOCK_SIZE, exactMatch, isAnswered, type QuizMode } from '../utils/quizModes'
 import type { McqDocument, McqQuestion } from '../types'
 
 type QuizState = 'list' | 'active' | 'results'
@@ -22,8 +23,12 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
   const [state, setState] = useState<QuizState>('list')
   const [files, setFiles] = useState<McqMeta[]>([])
   const [doc, setDoc] = useState<McqDocument | null>(null)
+  const [pendingDoc, setPendingDoc] = useState<McqDocument | null>(null)
   const [currentIdx, setCurrentIdx] = useState(0)
   const [questions, setQuestions] = useState<McqQuestion[]>([])
+  const [loop, setLoop] = useState(false)
+  const [pool, setPool] = useState<McqQuestion[]>([])
+  const [mastered, setMastered] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
@@ -40,40 +45,6 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
     loadFiles()
   }, [settings.mcqOutputDir])
 
-  // ── Start quiz ───────────────────────────────────────────────
-  const startQuiz = async (filename: string) => {
-    const dir = settings.mcqOutputDir || await getDefaultMcqDir()
-    const raw = await window.electronAPI.readFile(`${dir}/${filename}`)
-    if (!raw) return
-
-    const parsed = parseMcqFile(raw)
-    if (!parsed) return
-
-    setDoc(parsed)
-
-    let questions = parsed.questions.map(q => {
-      if (settings.randomizeOptions) {
-        const optionOrder = shuffle(q.options.map((_, i) => i))
-        return {
-          ...q,
-          options: optionOrder.map(i => q.options[i]),
-          correctIndices: q.correctIndices.map(idx => optionOrder.indexOf(idx))
-        }
-      }
-      return { ...q }
-    })
-    if (settings.randomizeQuestionOrder) questions = shuffle(questions)
-    setQuestions(questions.map(q => ({ ...q, selectedIndices: undefined })))
-
-    setCurrentIdx(0)
-    setElapsed(0)
-    setState('active')
-
-    // Start timer
-    timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000)
-    await window.electronAPI.log(`Started quiz: ${parsed.title} (${parsed.questions.length} questions)`)
-  }
-
   // ── Cleanup timer ────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -85,6 +56,63 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
   useEffect(() => {
     onActiveChange?.(state === 'active')
   }, [state, onActiveChange])
+
+  // ── File click → parse → mode picker ─────────────────────────
+  const handleFileClick = async (filename: string) => {
+    const dir = settings.mcqOutputDir || await getDefaultMcqDir()
+    const raw = await window.electronAPI.readFile(`${dir}/${filename}`)
+    if (!raw) return
+
+    const parsed = parseMcqFile(raw)
+    if (!parsed) return
+
+    setPendingDoc(parsed)
+    await window.electronAPI.log(`Selected quiz: ${parsed.title} (${parsed.questions.length} questions)`)
+  }
+
+  const pickMode = async (mode: QuizMode) => {
+    if (!pendingDoc) return
+    const picked = pendingDoc
+    setPendingDoc(null)
+    await startQuiz(picked, mode)
+  }
+
+  // ── Start quiz ───────────────────────────────────────────────
+  const startQuiz = async (parsed: McqDocument, mode: QuizMode) => {
+    setDoc(parsed)
+
+    let qs = parsed.questions.map(q => {
+      if (settings.randomizeOptions) {
+        const optionOrder = shuffle(q.options.map((_, i) => i))
+        return {
+          ...q,
+          options: optionOrder.map(i => q.options[i]),
+          correctIndices: q.correctIndices.map(idx => optionOrder.indexOf(idx))
+        }
+      }
+      return { ...q }
+    })
+    if (settings.randomizeQuestionOrder) qs = shuffle(qs)
+
+    setLoop(mode === 'loop')
+    setMastered(false)
+    const cleared = qs.map(q => ({ ...q, selectedIndices: undefined }))
+    if (mode === 'loop') {
+      setPool(cleared)
+      setQuestions(cleared.slice(0, BLOCK_SIZE))
+    } else {
+      setPool([])
+      setQuestions(cleared)
+    }
+
+    setCurrentIdx(0)
+    setElapsed(0)
+    setState('active')
+
+    // Start timer
+    timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000)
+    await window.electronAPI.log(`Started quiz: ${parsed.title} (${parsed.questions.length} questions, ${mode} mode)`)
+  }
 
   // ── Answer selection ─────────────────────────────────────────
   const selectAnswer = (optIdx: number) => {
@@ -115,6 +143,24 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
   const goPrev = () => {
     if (currentIdx > 0) {
       setCurrentIdx(i => i - 1)
+    }
+  }
+
+  // ── Loop advance ─────────────────────────────────────────────
+  const advanceLoopNow = async () => {
+    if (!questions.every(isAnswered)) return
+    const { done, pool: nextPool, batch } = advanceLoop(pool, questions)
+    if (done) {
+      if (timerRef.current) clearInterval(timerRef.current)
+      clearRawContentMap()
+      setMastered(true)
+      setState('list')
+      await window.electronAPI.log(`Completed loop: all questions mastered`)
+      loadFiles()
+    } else {
+      setPool(nextPool)
+      setQuestions(batch)
+      setCurrentIdx(0)
     }
   }
 
@@ -179,6 +225,10 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || e.key === 'q') {
+        if (pendingDoc) {
+          setPendingDoc(null)
+          return
+        }
         if (state === 'active' || state === 'results') {
           if (timerRef.current) clearInterval(timerRef.current)
           clearRawContentMap()
@@ -204,7 +254,7 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [state, currentIdx, questions])
+  }, [state, currentIdx, questions, pendingDoc])
 
   // ── Copy handler (copy-btn, inline-code, inline-math) ────────
   useEffect(() => {
@@ -241,12 +291,13 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
     return (
       <div className="panel">
         <h2>Take Quiz</h2>
+        {mastered && <div className="mastered-msg">All questions mastered!</div>}
         {files.length === 0 ? (
           <p>No .mcq files found. Generate one first.</p>
         ) : (
           <ul className="file-list">
             {files.map(f => (
-              <li key={f.name} className="file-item" onClick={() => startQuiz(f.name)}>
+              <li key={f.name} className="file-item" onClick={() => handleFileClick(f.name)}>
                 <div className="file-item-info">
                   <div className="file-item-title">{f.title}</div>
                   <div className="file-item-meta">
@@ -257,6 +308,23 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
             ))}
           </ul>
         )}
+
+        {pendingDoc && (
+          <div className="overlay" onClick={() => setPendingDoc(null)}>
+            <div className="mode-picker" onClick={e => e.stopPropagation()}>
+              <h2>Choose a mode</h2>
+              <button className="mode-btn" onClick={() => pickMode('loop')}>
+                <strong>Loop Mode</strong>
+                <span>Instant feedback on · retakes wrong answers until mastered · no results page</span>
+              </button>
+              <button className="mode-btn" onClick={() => pickMode('normal')}>
+                <strong>Normal Mode</strong>
+                <span>Feedback as set in settings · results page at the end</span>
+              </button>
+              <button className="mode-cancel" onClick={() => setPendingDoc(null)}>Cancel</button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -264,11 +332,12 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
   // ── Render: active quiz ──────────────────────────────────────
   if (state === 'active' && doc) {
     const q = questions[currentIdx]
+    const instant = settings.instantFeedback || loop
     const answered = isAnswered(q)
-    const isCorrect = answered && exactMatch(q)
     const allAnswered = questions.every(isAnswered)
     const labels = ['A', 'B', 'C', 'D']
     const multi = q.multiAnswer
+    const remaining = Math.max(0, pool.length - questions.length)
 
     return (
       <div className="quiz-container">
@@ -283,12 +352,14 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
           </button>
           <span className="quiz-progress">
             Question {currentIdx + 1} of {questions.length}
+            {loop && ` · ${remaining} left`}
           </span>
           {multi ? (
             <span className="tag tag-multi">Select all that apply</span>
           ) : (
             <span className="tag tag-single">Single answer</span>
           )}
+          {loop && <span className="tag tag-loop">Loop</span>}
           <span className="quiz-timer">{formatTime(elapsed)}</span>
         </div>
 
@@ -299,7 +370,7 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
           {q.options.map((opt, i) => {
             const isSelected = !!q.selectedIndices?.includes(i)
             let cls = multi ? 'option-card option-card-check' : 'option-card option-card-radio'
-            if (answered && settings.instantFeedback) {
+            if (answered && instant) {
               if (q.correctIndices.includes(i)) cls += ' correct'
               else if (isSelected) cls += ' wrong'
             } else if (isSelected) {
@@ -315,7 +386,7 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
           })}
         </div>
 
-        {answered && settings.instantFeedback && q.explanation && (
+        {answered && instant && q.explanation && (
           <div className="preview" style={{ marginBottom: 16 }}>
             <strong>Explanation:</strong>{' '}
             <span dangerouslySetInnerHTML={{ __html: renderRichText(q.explanation) }} />
@@ -327,9 +398,15 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
             Previous
           </button>
           {currentIdx === questions.length - 1 ? (
-            <button disabled={!allAnswered} onClick={finishQuiz}>
-              See Results
-            </button>
+            loop ? (
+              <button disabled={!allAnswered} onClick={advanceLoopNow}>
+                Continue
+              </button>
+            ) : (
+              <button disabled={!allAnswered} onClick={finishQuiz}>
+                See Results
+              </button>
+            )
           ) : (
             <button onClick={goNext}>Next</button>
           )}
@@ -423,15 +500,4 @@ function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return `${m}:${s.toString().padStart(2, '0')}`
-}
-
-function exactMatch(q: McqQuestion): boolean {
-  if (!q.selectedIndices || q.selectedIndices.length === 0) return false
-  const a = [...q.selectedIndices].sort().join(',')
-  const b = [...q.correctIndices].sort().join(',')
-  return a === b
-}
-
-function isAnswered(q: McqQuestion): boolean {
-  return !!(q.selectedIndices && q.selectedIndices.length > 0)
 }

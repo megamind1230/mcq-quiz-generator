@@ -4,7 +4,7 @@
 * Current Bugs
   - [O] Mobile PWA ships with no install/distribution story yet.  Students open
         files via the in-app picker; native "Open with..." is deferred until a
-        Capacitor/APK build (see mobile plan-todos.org).
+        Capacitor/APK build (see mobile plans-and-todos.org).
 
 * Fixed Bugs
   - [X] Leave button not showing red (v0.4.0) -- the =secondary= button class

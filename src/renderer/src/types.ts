@@ -1,7 +1,7 @@
 declare global {
   interface Window {
     electronAPI: {
-      openFile: (filters?: { name: string; extensions: string[] }[]) => Promise<string | null>
+      openFile: (filters?: { name: string; extensions: string[] }[], defaultPath?: string) => Promise<string | null>
       openDirectory: () => Promise<string | null>
       saveFile: (opts?: { defaultPath?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<string | null>
       exportPdf: (html: string, outPath: string) => Promise<boolean>

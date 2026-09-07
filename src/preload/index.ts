@@ -1,8 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  openFile: (filters?: { name: string; extensions: string[] }[]) =>
-    ipcRenderer.invoke('dialog:openFile', filters),
+  openFile: (filters?: { name: string; extensions: string[] }[], defaultPath?: string) =>
+    ipcRenderer.invoke('dialog:openFile', filters, defaultPath),
   openDirectory: () =>
     ipcRenderer.invoke('dialog:openDirectory'),
   saveFile: (opts?: { defaultPath?: string; filters?: { name: string; extensions: string[] }[] }) =>

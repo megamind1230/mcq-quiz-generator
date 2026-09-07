@@ -27,14 +27,16 @@ export function buildPrompt(content: string, questionCount: number, multiAnswer 
 - Use --- on its own line as a separator between questions
 - Do NOT use any markdown code fences
 - Cover EVERY section of the content -- do not skip any part
-- Generate exactly ${questionCount} questions`
+- Generate exactly ${questionCount} questions
+- Do NOT translate or modify these exact keywords: ## Question, **[Answer: ...]**, **Explanation:**, A., B., C., D.  The app parser depends on them.`
     : `- Each question must have exactly 4 options (A, B, C, D)
 - Make sure exactly one answer is correct
 - Distractors should be plausible but clearly wrong
 - Use --- on its own line as a separator between questions
 - Do NOT use any markdown code fences
 - Cover EVERY section of the content -- do not skip any part
-- Generate exactly ${questionCount} questions`
+- Generate exactly ${questionCount} questions
+- Do NOT translate or modify these exact keywords: ## Question, **[Answer: ...]**, **Explanation:**, A., B., C., D.  The app parser depends on them.`
 
   return `You are an educator creating multiple-choice questions from study material.
 Given the deck content below, create ${questionCount} questions.

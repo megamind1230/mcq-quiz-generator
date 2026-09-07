@@ -17,10 +17,20 @@ export default function GeneratePanel() {
   const [error, setError] = useState<string | null>(null)
   const [encResult, setEncResult] = useState<string | null>(null)
   const [multiAnswer, setMultiAnswer] = useState(false)
+  const [bulkRunning, setBulkRunning] = useState(false)
+  const [bulkResult, setBulkResult] = useState<string | null>(null)
+
+  const LAST_DIR_KEY = 'mcq-last-open-dir'
+  const getLastDir = () => localStorage.getItem(LAST_DIR_KEY)
+  const saveLastDir = (filePath: string) => {
+    const dir = filePath.replace(/\/[^/]+$/, '')
+    localStorage.setItem(LAST_DIR_KEY, dir)
+  }
 
   const handleOpenFile = async () => {
-    const path = await window.electronAPI.openFile()
+    const path = await window.electronAPI.openFile(undefined, getLastDir() || undefined)
     if (!path) return
+    saveLastDir(path)
     setFilePath(path)
     setPreview(null)
     setError(null)
@@ -97,8 +107,9 @@ export default function GeneratePanel() {
   const handleEncryptExisting = async () => {
     const path = await window.electronAPI.openFile([
       { name: 'MCQ Files', extensions: ['mcq', 'emcq'] }
-    ])
+    ], getLastDir() || undefined)
     if (!path) return
+    saveLastDir(path)
     setEncResult(null)
 
     const raw = await window.electronAPI.readFile(path)
@@ -119,6 +130,45 @@ export default function GeneratePanel() {
       ? `${isEmcq ? 'Re-encrypted' : 'Encrypted'}: ${outPath}`
       : 'Failed to write encrypted file')
     if (ok) await window.electronAPI.log(`Encrypted ${path} -> ${outPath}`)
+  }
+
+  const handleBulkEncrypt = async () => {
+    const dir = settings.mcqOutputDir || await getDefaultMcqDir()
+    const mcqFiles = await window.electronAPI.listFiles(dir, '.mcq')
+    const emcqFiles = await window.electronAPI.listFiles(dir, '.emcq')
+
+    const emcqBases = new Set(emcqFiles.map(f => f.replace(/\.emcq$/i, '')))
+    const toEncrypt = mcqFiles.filter(f => !emcqBases.has(f.replace(/\.mcq$/, '')))
+
+    if (toEncrypt.length === 0) {
+      setBulkResult('No .mcq files need encrypting (all already have .emcq).')
+      return
+    }
+
+    setBulkRunning(true)
+    setBulkResult(null)
+    let encrypted = 0
+    let failed = 0
+
+    for (let i = 0; i < toEncrypt.length; i++) {
+      setBulkResult(`Encrypting ${i + 1} of ${toEncrypt.length}...`)
+      const mcqName = toEncrypt[i]
+      const base = mcqName.replace(/\.mcq$/, '')
+      const raw = await window.electronAPI.readFile(`${dir}/${mcqName}`)
+      if (!raw) { failed++; continue }
+
+      const emcqContent = await window.electronAPI.encryptMcq(raw)
+      const ok = await window.electronAPI.writeFile(`${dir}/${base}.emcq`, emcqContent)
+      if (ok) encrypted++
+      else failed++
+    }
+
+    setBulkRunning(false)
+    const parts = []
+    if (encrypted > 0) parts.push(`Encrypted ${encrypted} file${encrypted !== 1 ? 's' : ''}`)
+    if (failed > 0) parts.push(`${failed} failed`)
+    setBulkResult(parts.join(', '))
+    await window.electronAPI.log(`Bulk encrypt: ${encrypted} encrypted, ${failed} failed in ${dir}`)
   }
 
   return (
@@ -215,6 +265,23 @@ export default function GeneratePanel() {
         {encResult && (
           <p style={{ fontSize: 13, marginTop: 8, color: encResult.startsWith('Failed') ? 'var(--error)' : 'var(--success)' }}>
             {encResult}
+          </p>
+        )}
+      </div>
+
+      <hr style={{ margin: '24px 0' }} />
+
+      <div className="preview-card">
+        <h3>Bulk Encrypt .mcq → .emcq</h3>
+        <p style={{ fontSize: 13, color: 'var(--text-dim)', margin: '0 0 8px' }}>
+          Encrypts all .mcq files in the output directory that don't already have a matching .emcq.
+        </p>
+        <button disabled={bulkRunning} onClick={handleBulkEncrypt}>
+          {bulkRunning ? 'Encrypting...' : 'Bulk Encrypt All'}
+        </button>
+        {bulkResult && (
+          <p style={{ fontSize: 13, marginTop: 8, color: bulkResult.startsWith('No ') ? 'var(--text-dim)' : 'var(--success)' }}>
+            {bulkResult}
           </p>
         )}
       </div>

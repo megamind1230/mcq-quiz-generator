@@ -62,9 +62,10 @@ app.on('window-all-closed', () => {
 
 // ── IPC Handlers ──────────────────────────────────────────────
 
-ipcMain.handle('dialog:openFile', async (_event, filters?: { name: string; extensions: string[] }[]) => {
+ipcMain.handle('dialog:openFile', async (_event, filters?: { name: string; extensions: string[] }[], defaultPath?: string) => {
   const result = await dialog.showOpenDialog({
     properties: ['openFile'],
+    defaultPath,
     filters: filters || [
       { name: 'Text Files', extensions: ['txt', 'md', 'org'] },
       { name: 'All Files', extensions: ['*'] }

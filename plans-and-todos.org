@@ -1,4 +1,4 @@
-#+TITLE: plan-todos.org
+#+TITLE: plans-and-todos.org
 #+DESCRIPTION: Detailed implementation steps for MCQ Quiz Generator
 
 Inspired by [[https://github.com/megamind1230/nextlearn][megamind1230/nextlearn]] MCQ feature.
@@ -97,6 +97,17 @@ Inspired by [[https://github.com/megamind1230/nextlearn][megamind1230/nextlearn]
   - [X] Import via in-app file picker, offline quiz, local logs, PDF via print
   - [X] Mobile tests (16) + production build with PWA precache/manifest/icons
 
+* Phase 13: Loop mode + settings expansion + quality-of-life            [DONE]
+  - [X] Loop mode: retakes wrong answers in batches of 15 until all mastered
+  - [X] Mode picker overlay: Loop vs Normal, shown after selecting a quiz
+  - [X] Extracted =quizModes.ts= (grading + loop logic) + unit tests
+  - [X] Bulk encrypt: Generate tab encrypts all unencrypted =.mcq= -> =.emcq=
+  - [X] Settings: added Randomize Options, Randomize Question Order, Encrypt Output
+  - [X] Instant feedback hint ("Always on in Loop Mode")
+  - [X] Remember last file picker directory
+  - [X] AI prompt keyword translation constraint
+  - [X] Renamed =plan-todos.org= -> =plans-and-todos.org=
+
 * Future: Skipped features (add later)                               [TODO]
   - [X] screenshots dir
   - [ ] Anki export
@@ -111,5 +122,5 @@ Inspired by [[https://github.com/megamind1230/nextlearn][megamind1230/nextlearn]
   - [ ] Image rendering in quiz content
   - [ ] Cloze-style flashcards
   - [ ] Multi-language support (i18n)
-  - [ ] Quiz shuffle (randomize question order)
+  - [X] Quiz shuffle (randomize question order)
   - [ ] Export quiz results to CSV/org
