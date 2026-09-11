@@ -7,6 +7,17 @@
         Capacitor/APK build (see mobile plans-and-todos.org).
 
 * Fixed Bugs
+  - [X] Answer changing in Loop/Instant modes (v0.6.0) -- Users could change
+        answers after seeing instant feedback, allowing cheating in exam mode.
+        Fixed by adding answer locking: in Loop and Instant modes, once a question
+        is answered, the selection is locked and option buttons are disabled.
+  - [X] Duplicated utility functions (v0.6.0) -- =formatTime=, =escapeHtml=,
+        =exactMatch=, and =ANSWER_LABELS= were duplicated across multiple files.
+        Fixed by extracting =format.ts=, =constants.ts=, and having quizExporter
+        import =exactMatch= from quizModes instead of redefining it.
+  - [X] Inline styles in results view (v0.6.0) -- Results page had 8+ inline
+        style objects (including a 14-property export dropdown style). Fixed by
+        moving all styles to CSS classes (=.results-*=, =.export-*=).
   - [X] Leave button not showing red (v0.4.0) -- the =secondary= button class
         forces transparent background with =!important=, so the red Leave button
         style was overridden.  Fixed by removing =secondary= from the Leave

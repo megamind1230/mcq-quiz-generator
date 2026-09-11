@@ -108,6 +108,22 @@ Inspired by [[https://github.com/megamind1230/nextlearn][megamind1230/nextlearn]
   - [X] AI prompt keyword translation constraint
   - [X] Renamed =plan-todos.org= -> =plans-and-todos.org=
 
+* Phase 14: Three quiz modes + refactoring & deduplication              [DONE]
+  - [X] Three quiz modes: Loop (instant + retake), Instant (instant), Classic (deferred)
+  - [X] Removed =instantFeedback= setting — feedback now determined by mode
+  - [X] Added =isInstantMode()= helper to quizModes.ts
+  - [X] Extracted =format.ts= (shared =formatTime= + =escapeHtml=)
+  - [X] Extracted =constants.ts= (=ANSWER_LABELS= + =ANSWER_KEYS=)
+  - [X] Deduped =exactMatch= — quizExporter imports from quizModes
+  - [X] Extracted =leaveQuiz= cleanup function in QuizView (4 call sites)
+  - [X] Extracted =prepareQuestions= pure function from startQuiz
+  - [X] Added =MODE_CONFIG= for mode picker (driven by config, not hardcoded)
+  - [X] Moved inline styles to CSS classes in results view
+  - [X] Added =.tag-instant= CSS class for Instant mode tag
+  - [X] Answer locking in Loop/Instant modes (anti-cheat)
+  - [X] Tests: 45 tests across 7 files, all green
+  - [X] Typecheck clean
+
 * Future: Skipped features (add later)                               [TODO]
   - [X] screenshots dir
   - [ ] Anki export

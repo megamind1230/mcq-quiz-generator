@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { loadQuizResults } from '../utils/quizLogger'
+import { formatTime } from '../utils/format'
 import type { QuizResult } from '../types'
 
 export default function QuizLogs() {
@@ -39,10 +40,4 @@ function buildOrgTable(results: QuizResult[]): string {
   }).join('\n')
 
   return cols + sep + rows
-}
-
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${m}:${s.toString().padStart(2, '0')}`
 }

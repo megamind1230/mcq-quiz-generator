@@ -50,7 +50,6 @@ export interface AppSettings {
   geminiApiKey: string
   mcqOutputDir: string
   theme: 'light' | 'dark'
-  instantFeedback: boolean
   randomizeOptions: boolean
   randomizeQuestionOrder: boolean
   encryptOutput: boolean

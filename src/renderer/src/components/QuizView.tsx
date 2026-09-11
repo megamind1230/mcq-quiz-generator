@@ -6,7 +6,9 @@ import { renderRichText, getRawContent, clearRawContentMap } from '../utils/rend
 import { shuffle } from '../utils/shuffle'
 import { buildExport, buildHtml, formatExtension, type ExportData, type ExportFormat } from '../utils/quizExporter'
 import { getDefaultMcqDir } from '../utils/settings'
-import { advanceLoop, BLOCK_SIZE, exactMatch, isAnswered, type QuizMode } from '../utils/quizModes'
+import { advanceLoop, BLOCK_SIZE, exactMatch, isAnswered, isInstantMode, type QuizMode } from '../utils/quizModes'
+import { formatTime } from '../utils/format'
+import { ANSWER_LABELS, ANSWER_KEYS } from '../utils/constants'
 import type { McqDocument, McqQuestion } from '../types'
 
 type QuizState = 'list' | 'active' | 'results'
@@ -18,6 +20,28 @@ interface McqMeta {
   generated: string
 }
 
+const MODE_CONFIG: Record<QuizMode, { label: string; description: string }> = {
+  loop:    { label: 'Loop Mode',    description: `Instant feedback · retakes wrong answers every ${BLOCK_SIZE} questions · no results page` },
+  instant: { label: 'Instant Mode', description: 'Instant feedback on every answer · no results page' },
+  classic: { label: 'Classic Mode', description: 'No instant feedback · results summary at the end' },
+}
+
+function prepareQuestions(questions: McqQuestion[], randomizeOptions: boolean, randomizeQuestionOrder: boolean): McqQuestion[] {
+  let qs = questions.map(q => {
+    if (randomizeOptions) {
+      const optionOrder = shuffle(q.options.map((_, i) => i))
+      return {
+        ...q,
+        options: optionOrder.map(i => q.options[i]),
+        correctIndices: q.correctIndices.map(idx => optionOrder.indexOf(idx))
+      }
+    }
+    return { ...q }
+  })
+  if (randomizeQuestionOrder) qs = shuffle(qs)
+  return qs.map(q => ({ ...q, selectedIndices: undefined }))
+}
+
 export default function QuizView({ onActiveChange }: { onActiveChange?: (active: boolean) => void }) {
   const { settings } = useSettings()
   const [state, setState] = useState<QuizState>('list')
@@ -26,7 +50,7 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
   const [pendingDoc, setPendingDoc] = useState<McqDocument | null>(null)
   const [currentIdx, setCurrentIdx] = useState(0)
   const [questions, setQuestions] = useState<McqQuestion[]>([])
-  const [loop, setLoop] = useState(false)
+  const [mode, setMode] = useState<QuizMode>('classic')
   const [pool, setPool] = useState<McqQuestion[]>([])
   const [mastered, setMastered] = useState(false)
   const [elapsed, setElapsed] = useState(0)
@@ -77,27 +101,23 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
     await startQuiz(picked, mode)
   }
 
+  // ── Leave quiz (cleanup) ──────────────────────────────────────
+  const leaveQuiz = (opts?: { confirm?: boolean; reload?: boolean }) => {
+    if (opts?.confirm && !confirm('Leave quiz? Your progress will be lost.')) return
+    if (timerRef.current) clearInterval(timerRef.current)
+    clearRawContentMap()
+    setState('list')
+    if (opts?.reload) loadFiles()
+  }
+
   // ── Start quiz ───────────────────────────────────────────────
-  const startQuiz = async (parsed: McqDocument, mode: QuizMode) => {
+  const startQuiz = async (parsed: McqDocument, newMode: QuizMode) => {
     setDoc(parsed)
-
-    let qs = parsed.questions.map(q => {
-      if (settings.randomizeOptions) {
-        const optionOrder = shuffle(q.options.map((_, i) => i))
-        return {
-          ...q,
-          options: optionOrder.map(i => q.options[i]),
-          correctIndices: q.correctIndices.map(idx => optionOrder.indexOf(idx))
-        }
-      }
-      return { ...q }
-    })
-    if (settings.randomizeQuestionOrder) qs = shuffle(qs)
-
-    setLoop(mode === 'loop')
+    setMode(newMode)
     setMastered(false)
-    const cleared = qs.map(q => ({ ...q, selectedIndices: undefined }))
-    if (mode === 'loop') {
+
+    const cleared = prepareQuestions(parsed.questions, settings.randomizeOptions, settings.randomizeQuestionOrder)
+    if (newMode === 'loop') {
       setPool(cleared)
       setQuestions(cleared.slice(0, BLOCK_SIZE))
     } else {
@@ -119,6 +139,8 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
     setQuestions(prev => {
       const next = [...prev]
       const cur = next[currentIdx]
+      const locked = isInstantMode(mode) && isAnswered(cur)
+      if (locked) return prev
       if (cur.multiAnswer) {
         const curSel = cur.selectedIndices || []
         const newSel = curSel.includes(optIdx)
@@ -230,9 +252,7 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
           return
         }
         if (state === 'active' || state === 'results') {
-          if (timerRef.current) clearInterval(timerRef.current)
-          clearRawContentMap()
-          setState('list')
+          leaveQuiz()
         }
         return
       }
@@ -242,11 +262,13 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
       if (!content) return
       if (e.key === 'n' || e.key === 'ArrowRight') goNext()
       else if (e.key === 'p' || e.key === 'ArrowLeft') goPrev()
-      else if (e.key === 'a') selectAnswer(0)
-      else if (e.key === 'b') selectAnswer(1)
-      else if (e.key === 'c') selectAnswer(2)
-      else if (e.key === 'd') selectAnswer(3)
-      else if (e.key === 'j') content.scrollBy({ top: 40, behavior: 'smooth' })
+      else {
+        const keyIdx = ANSWER_KEYS.indexOf(e.key as typeof ANSWER_KEYS[number])
+        if (keyIdx !== -1 && keyIdx < questions[currentIdx].options.length) {
+          selectAnswer(keyIdx)
+        }
+      }
+      if (e.key === 'j') content.scrollBy({ top: 40, behavior: 'smooth' })
       else if (e.key === 'k') content.scrollBy({ top: -40, behavior: 'smooth' })
       else if (e.key === 'h') content.scrollBy({ left: -40, behavior: 'smooth' })
       else if (e.key === 'l') content.scrollBy({ left: 40, behavior: 'smooth' })
@@ -313,14 +335,12 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
           <div className="overlay" onClick={() => setPendingDoc(null)}>
             <div className="mode-picker" onClick={e => e.stopPropagation()}>
               <h2>Choose a mode</h2>
-              <button className="mode-btn" onClick={() => pickMode('loop')}>
-                <strong>Loop Mode</strong>
-                <span>Instant feedback on · retakes wrong answers until mastered · no results page</span>
-              </button>
-              <button className="mode-btn" onClick={() => pickMode('normal')}>
-                <strong>Normal Mode</strong>
-                <span>Feedback as set in settings · results page at the end</span>
-              </button>
+              {(['loop', 'instant', 'classic'] as QuizMode[]).map(m => (
+                <button key={m} className="mode-btn" onClick={() => pickMode(m)}>
+                  <strong>{MODE_CONFIG[m].label}</strong>
+                  <span>{MODE_CONFIG[m].description}</span>
+                </button>
+              ))}
               <button className="mode-cancel" onClick={() => setPendingDoc(null)}>Cancel</button>
             </div>
           </div>
@@ -332,34 +352,29 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
   // ── Render: active quiz ──────────────────────────────────────
   if (state === 'active' && doc) {
     const q = questions[currentIdx]
-    const instant = settings.instantFeedback || loop
+    const instant = isInstantMode(mode)
     const answered = isAnswered(q)
     const allAnswered = questions.every(isAnswered)
-    const labels = ['A', 'B', 'C', 'D']
     const multi = q.multiAnswer
     const remaining = Math.max(0, pool.length - questions.length)
 
     return (
       <div className="quiz-container">
         <div className="quiz-header">
-          <button className="leave-btn" onClick={() => {
-            if (!confirm('Leave quiz? Your progress will be lost.')) return
-            if (timerRef.current) clearInterval(timerRef.current)
-            clearRawContentMap()
-            setState('list')
-          }}>
+          <button className="leave-btn" onClick={() => leaveQuiz({ confirm: true })}>
             ← Leave
           </button>
           <span className="quiz-progress">
             Question {currentIdx + 1} of {questions.length}
-            {loop && ` · ${remaining} left`}
+            {mode === 'loop' && ` · ${remaining} left`}
           </span>
           {multi ? (
             <span className="tag tag-multi">Select all that apply</span>
           ) : (
             <span className="tag tag-single">Single answer</span>
           )}
-          {loop && <span className="tag tag-loop">Loop</span>}
+          {mode === 'loop' && <span className="tag tag-loop">Loop</span>}
+          {mode === 'instant' && <span className="tag tag-instant">Instant</span>}
           <span className="quiz-timer">{formatTime(elapsed)}</span>
         </div>
 
@@ -377,9 +392,9 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
               cls += ' selected'
             }
             return (
-              <button key={i} className={cls} onClick={() => selectAnswer(i)}>
+              <button key={i} className={cls} onClick={() => selectAnswer(i)} disabled={instant && answered}>
                 <span className="marker">{multi ? (isSelected ? '☑' : '☐') : (isSelected ? '●' : '○')}</span>
-                <span className="label">{labels[i]}.</span>{' '}
+                <span className="label">{ANSWER_LABELS[i]}.</span>{' '}
                 <span dangerouslySetInnerHTML={{ __html: renderRichText(opt) }} />
               </button>
             )
@@ -387,7 +402,7 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
         </div>
 
         {answered && instant && q.explanation && (
-          <div className="preview" style={{ marginBottom: 16 }}>
+          <div className="preview">
             <strong>Explanation:</strong>{' '}
             <span dangerouslySetInnerHTML={{ __html: renderRichText(q.explanation) }} />
           </div>
@@ -398,9 +413,13 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
             Previous
           </button>
           {currentIdx === questions.length - 1 ? (
-            loop ? (
+            mode === 'loop' ? (
               <button disabled={!allAnswered} onClick={advanceLoopNow}>
                 Continue
+              </button>
+            ) : mode === 'instant' ? (
+              <button disabled={!allAnswered} onClick={() => leaveQuiz()}>
+                Finish
               </button>
             ) : (
               <button disabled={!allAnswered} onClick={finishQuiz}>
@@ -431,26 +450,23 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
           <span>{formatTime(elapsed)} taken</span>
         </div>
 
-        <div style={{ textAlign: 'left', marginTop: 24 }}>
+        <div className="results-review-list">
           {questions.map((q, i) => {
-            const labels = ['A', 'B', 'C', 'D']
             const right = exactMatch(q)
-            const selectedTxt = q.selectedIndices ? q.selectedIndices.map(i => labels[i]).join(', ') : ''
-            const answerTxt = q.correctIndices.map(i => labels[i]).join(', ')
-            const marker = right ? '✅' : '❌'
-            const markerColor = right ? 'var(--success)' : 'var(--error)'
+            const selectedTxt = q.selectedIndices ? q.selectedIndices.map(i => ANSWER_LABELS[i]).join(', ') : ''
+            const answerTxt = q.correctIndices.map(i => ANSWER_LABELS[i]).join(', ')
             return (
-              <div key={i} className="preview-question" style={{ marginBottom: 12 }}>
+              <div key={i} className="preview-question">
                 <p className="q-text" dangerouslySetInnerHTML={{ __html: `${i + 1}. ${renderRichText(q.question)}` }} />
-                <p style={{ fontSize: 13, marginTop: 4 }}>
+                <p className="results-answer-line">
                   <strong>Your Answer(s) ==&gt;</strong> {selectedTxt}
                 </p>
-                <p style={{ fontSize: 13, marginTop: 2 }}>
+                <p className="results-correct-line">
                   <strong>Correct Answer(s) ==&gt;</strong> {answerTxt}{' '}
-                  <span style={{ color: markerColor }}>{marker}</span>
+                  <span className={right ? 'results-correct' : 'results-wrong'}>{right ? '✅' : '❌'}</span>
                 </p>
                 {q.explanation && (
-                  <div style={{ fontSize: 13, marginTop: 4, color: 'var(--muted)' }}>
+                  <div className="results-explanation">
                     <strong>Explanation:</strong>{' '}
                     <span dangerouslySetInnerHTML={{ __html: renderRichText(q.explanation) }} />
                   </div>
@@ -461,20 +477,17 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
         </div>
 
         <div className="results-actions">
-          <div className="export-menu" style={{ position: 'relative', display: 'inline-block' }}>
+          <div className="export-menu">
             <button className="secondary" onClick={() => { setExportMsg(null); setExportOpen(o => !o) }}>
               Export ▾
             </button>
             {exportOpen && (
-              <div className="export-dropdown" style={{ position: 'absolute', bottom: 44, left: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, zIndex: 10, minWidth: 140, overflow: 'hidden' }}>
+              <div className="export-dropdown">
                 {(['pdf', 'html', 'org', 'md', 'txt'] as ExportFormat[]).map(f => (
                   <button
                     key={f}
                     className="export-item"
                     onClick={() => handleExport(f)}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text)', padding: '8px 12px', cursor: 'pointer', fontSize: 14 }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent)' }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'none' }}
                   >
                     .{formatExtension(f)}
                   </button>
@@ -482,10 +495,10 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
               </div>
             )}
           </div>
-          <button onClick={() => { clearRawContentMap(); setState('list'); loadFiles() }}>Back to Quiz List</button>
+          <button onClick={() => leaveQuiz({ reload: true })}>Back to Quiz List</button>
         </div>
         {exportMsg && (
-          <p style={{ fontSize: 13, marginTop: 8, color: exportMsg.includes('Failed') ? 'var(--error)' : 'var(--success)' }}>
+          <p className={`results-export-msg ${exportMsg.includes('Failed') ? 'error' : 'success'}`}>
             {exportMsg}
           </p>
         )}
@@ -494,10 +507,4 @@ export default function QuizView({ onActiveChange }: { onActiveChange?: (active:
   }
 
   return null
-}
-
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${m}:${s.toString().padStart(2, '0')}`
 }

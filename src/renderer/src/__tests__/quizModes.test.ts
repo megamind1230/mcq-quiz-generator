@@ -16,14 +16,18 @@ describe('quizModes', () => {
   it('QuizMode type is a string union', () => {
     const mode: QuizMode = 'loop'
     expect(mode).toBe('loop')
+    const mode2: QuizMode = 'instant'
+    expect(mode2).toBe('instant')
+    const mode3: QuizMode = 'classic'
+    expect(mode3).toBe('classic')
   })
 
   it('exactMatch is all-or-nothing on selection sets', () => {
     expect(exactMatch({ ...q(1), selectedIndices: [0] })).toBe(true)
     expect(exactMatch({ ...q(1, 1), selectedIndices: [0] })).toBe(false)
     expect(exactMatch(q(1))).toBe(false)
-    expect(exactMatch({ ...q(2), correctIndices: [0, 1], selectedIndices: [1, 0], multiAnswer: true })).toBe(true)
-    expect(exactMatch({ ...q(2), correctIndices: [0, 1], selectedIndices: [0], multiAnswer: true })).toBe(false)
+    expect(exactMatch({ correctIndices: [0, 1], selectedIndices: [1, 0] })).toBe(true)
+    expect(exactMatch({ correctIndices: [0, 1], selectedIndices: [0] })).toBe(false)
   })
 
   it('isAnswered is false until a selection exists', () => {

@@ -130,22 +130,6 @@ export default function Settings() {
       <hr />
 
       <div className="setting" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <label style={{ margin: 0 }}>
-          Instant Answer Feedback on click
-          <span style={{ display: 'block', fontSize: 12, color: 'var(--text-dim)', fontWeight: 400 }}>
-            Always on in Loop Mode (forced by the mode picker).
-          </span>
-        </label>
-        <input
-          type="checkbox"
-          checked={draft.instantFeedback}
-          onChange={e => setDraft({ instantFeedback: e.target.checked })}
-        />
-      </div>
-
-      <hr />
-
-      <div className="setting" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <label style={{ margin: 0 }}>Randomize answer order</label>
         <input
           type="checkbox"

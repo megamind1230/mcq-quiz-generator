@@ -1,4 +1,7 @@
 import { renderRichText } from './renderRichText'
+import { exactMatch } from './quizModes'
+import { formatTime, escapeHtml } from './format'
+import { ANSWER_LABELS } from './constants'
 
 export type ExportFormat = 'txt' | 'md' | 'org' | 'html' | 'pdf'
 
@@ -25,45 +28,22 @@ export function formatExtension(format: ExportFormat): string {
   return EXTENSIONS[format]
 }
 
-export interface ExportQuestion {
-  question: string
-  options: string[]
-  selectedIndices?: number[]
-  correctIndices: number[]
-  explanation?: string
-}
-
 export interface ExportData {
   title: string
   correct: number
   total: number
   timeTakenSeconds: number
-  questions: ExportQuestion[]
+  questions: { question: string; options: string[]; selectedIndices?: number[]; correctIndices: number[]; explanation?: string }[]
 }
 
-const LABELS = ['A', 'B', 'C', 'D']
-
-function exactMatch(q: ExportQuestion): boolean {
-  if (!q.selectedIndices || q.selectedIndices.length === 0) return false
-  const a = [...q.selectedIndices].sort().join(',')
-  const b = [...q.correctIndices].sort().join(',')
-  return a === b
-}
-
-function statusOf(q: ExportQuestion): { label: string; correct: boolean } {
+function statusOf(q: ExportData['questions'][number]): { label: string; correct: boolean } {
   if (!q.selectedIndices || q.selectedIndices.length === 0) return { label: 'Skipped', correct: false }
   const ok = exactMatch(q)
   return { label: ok ? 'Correct' : 'Wrong', correct: ok }
 }
 
 function letters(indices: number[]): string {
-  return indices.map(i => LABELS[i]).join(', ')
-}
-
-function fmtTime(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${m}:${s.toString().padStart(2, '0')}`
+  return indices.map(i => ANSWER_LABELS[i]).join(', ')
 }
 
 function percent(data: ExportData): number {
@@ -85,7 +65,7 @@ export function buildTxt(data: ExportData): string {
   lines.push('='.repeat(data.title.length))
   lines.push('')
   lines.push(`Score: ${data.correct}/${data.total} (${percent(data)}%)`)
-  lines.push(`Time taken: ${fmtTime(data.timeTakenSeconds)}`)
+  lines.push(`Time taken: ${formatTime(data.timeTakenSeconds)}`)
   lines.push('')
   data.questions.forEach((q, i) => {
     const st = statusOf(q)
@@ -110,7 +90,7 @@ export function buildMd(data: ExportData): string {
   lines.push('')
   lines.push(`**Score:** ${data.correct}/${data.total} (${percent(data)}%)`)
   lines.push('')
-  lines.push(`**Time taken:** ${fmtTime(data.timeTakenSeconds)}`)
+  lines.push(`**Time taken:** ${formatTime(data.timeTakenSeconds)}`)
   lines.push('')
   data.questions.forEach((q, i) => {
     const st = statusOf(q)
@@ -132,7 +112,7 @@ export function buildOrg(data: ExportData): string {
   lines.push(`#+TITLE: ${data.title}`)
   lines.push('')
   lines.push(`* Score: ${data.correct}/${data.total} (${percent(data)}%)`)
-  lines.push(`* Time taken: ${fmtTime(data.timeTakenSeconds)}`)
+  lines.push(`* Time taken: ${formatTime(data.timeTakenSeconds)}`)
   lines.push('')
   data.questions.forEach((q, i) => {
     const st = statusOf(q)
@@ -154,7 +134,7 @@ export function buildHtml(data: ExportData, css?: ExportCss): string {
     const color = !st.correct && q.selectedIndices && q.selectedIndices.length ? '#d9534f' : st.correct ? '#5cb85c' : '#f0ad4e'
     const opts = q.options.map((opt, j) => {
       const marker = q.selectedIndices?.includes(j) ? '▸' : ' '
-      return `<div class="opt"><span class="label">${marker} ${LABELS[j]}.</span> ${renderRichText(opt)}</div>`
+      return `<div class="opt"><span class="label">${marker} ${ANSWER_LABELS[j]}.</span> ${renderRichText(opt)}</div>`
     }).join('')
     const expl = q.explanation ? `<div class="expl"><strong>Explanation:</strong> ${renderRichText(q.explanation)}</div>` : ''
     const selectedTxt = q.selectedIndices && q.selectedIndices.length ? ` · You selected: ${letters(q.selectedIndices)}` : ''
@@ -193,14 +173,10 @@ h1 { font-size: 1.5em; }
 </head>
 <body>
 <h1>${escapeHtml(data.title)} — Results</h1>
-<div class="score">Score: ${data.correct}/${data.total} (${percent(data)}%) &nbsp;·&nbsp; Time: ${fmtTime(data.timeTakenSeconds)}</div>
+<div class="score">Score: ${data.correct}/${data.total} (${percent(data)}%) &nbsp;·&nbsp; Time: ${formatTime(data.timeTakenSeconds)}</div>
 ${body}
 </body>
 </html>`
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 function escapeCss(s: string): string {

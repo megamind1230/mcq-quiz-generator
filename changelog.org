@@ -3,6 +3,22 @@
 
 Inspired by [[https://github.com/megamind1230/nextlearn][megamind1230/nextlearn]] MCQ feature.
 
+* v0.6.0 - 2026-09-11
+  Three quiz modes + refactoring & deduplication.
+  - [X] *Three quiz modes:* Loop (instant feedback + retake wrong answers),
+        Instant (instant feedback, no retake), Classic (deferred feedback, results page)
+  - [X] *Removed instantFeedback setting* — feedback now determined by mode choice
+  - [X] *Answer locking* in Loop/Instant modes (anti-cheat: can't change answers after selection)
+  - [X] *Refactoring:* extracted =format.ts= (shared =formatTime= + =escapeHtml=)
+  - [X] *Refactoring:* extracted =constants.ts= (=ANSWER_LABELS= + =ANSWER_KEYS=)
+  - [X] *Refactoring:* deduped =exactMatch= — quizExporter imports from quizModes
+  - [X] *Refactoring:* extracted =leaveQuiz= cleanup function (4 call sites consolidated)
+  - [X] *Refactoring:* extracted =prepareQuestions= pure function from startQuiz
+  - [X] *Refactoring:* added =MODE_CONFIG= for mode picker (config-driven, not hardcoded)
+  - [X] *Refactoring:* moved inline styles to CSS classes in results view
+  - [X] *CSS:* added =.tag-instant= class, =.results-*= classes, =.export-*= classes
+  - [X] Tests: 45 tests across 7 files, all green; typecheck clean
+
 * v0.5.0 - 2026-09-08
   Loop mode, bulk encrypt, settings expansion, quality-of-life.
   - [X] *Loop mode:* retakes wrong answers in batches of 15 until all mastered;

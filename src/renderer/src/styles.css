@@ -197,6 +197,7 @@ body {
 
 .preview {
   margin-top: 12px;
+  margin-bottom: 16px;
   padding: 12px;
   background: var(--surface);
   border-radius: 6px;
@@ -676,6 +677,13 @@ hr {
   border: 1px solid var(--success);
 }
 
+/* ── Instant tag ──────────────────────────────────────────── */
+
+.tag-instant {
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
 /* ── Mastered message ──────────────────────────────────────── */
 
 .mastered-msg {
@@ -686,4 +694,83 @@ hr {
   background: color-mix(in srgb, var(--success) 12%, transparent);
   border: 1px solid var(--success);
   border-radius: 6px;
+}
+
+/* ── Results review ─────────────────────────────────────────── */
+
+.results-review-list {
+  text-align: left;
+  margin-top: 24px;
+}
+
+.results-answer-line {
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.results-correct-line {
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.results-correct {
+  color: var(--success);
+}
+
+.results-wrong {
+  color: var(--error);
+}
+
+.results-explanation {
+  font-size: 13px;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.results-export-msg {
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.results-export-msg.error {
+  color: var(--error);
+}
+
+.results-export-msg.success {
+  color: var(--success);
+}
+
+/* ── Export menu ─────────────────────────────────────────────── */
+
+.export-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.export-dropdown {
+  position: absolute;
+  bottom: 44px;
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  z-index: 10;
+  min-width: 140px;
+  overflow: hidden;
+}
+
+.export-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.export-item:hover {
+  background: var(--accent);
 }

@@ -6,7 +6,6 @@ export const DEFAULTS: AppSettings = {
   geminiApiKey: '',
   mcqOutputDir: '',
   theme: 'dark',
-  instantFeedback: false,
   randomizeOptions: true,
   randomizeQuestionOrder: true,
   encryptOutput: false,
